@@ -1,0 +1,21 @@
+services:
+  wend:
+    build: .
+    ports:
+      # this machine only; to serve your network, set ROUTER_TOKEN and publish on 0.0.0.0
+      - "127.0.0.1:8888:8888"
+    environment:
+      # Inside the container requests come from the Docker network, not localhost, so
+      # the dashboard would refuse changes. The port above is published on 127.0.0.1
+      # only, which keeps them to this machine.
+      ROUTER_REMOTE_UI: "1"
+      ROUTER_REMOTE_PIPE: "1"
+    env_file:
+      - path: wend.env      # provider keys; optional, keys can be added on the dashboard
+        required: false
+    volumes:
+      - wend-data:/data
+    restart: unless-stopped
+
+volumes:
+  wend-data:

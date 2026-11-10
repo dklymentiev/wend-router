@@ -1,0 +1,568 @@
+/* The dashboard UI kit (tokens, base, components), embedded in the binary and used by
+   both dashboard pages. Local additions are at the end. */
+/* =====================================================================
+   Tokens
+   Light is default; add data-theme="dark" on <html> for the dark surface.
+   All tokens are prefixed --sn-* to coexist with a page's own CSS.
+   ===================================================================== */
+
+/* Layer order — declared once, here. Services put their CSS in `app`. */
+@layer tokens, base, components, app;
+
+@layer tokens {
+
+  /* ---- shared: never change with theme ---- */
+  :root{
+    --sn-font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --sn-mono:'JetBrains Mono',ui-monospace,'SFMono-Regular',monospace;
+
+    /* radius scale (by element size) */
+    --sn-r-xs:6px;   /* dots, tiny chips      */
+    --sn-r-sm:8px;   /* icon buttons, small   */
+    --sn-r-md:11px;  /* buttons               */
+    --sn-r-lg:14px;  /* cards, fields, nodes  */
+    --sn-r-xl:18px;  /* panels                */
+    --sn-r-pill:999px;
+
+    /* spacing — 8px base */
+    --sn-sp-1:4px; --sn-sp-2:8px; --sn-sp-3:12px; --sn-sp-4:16px;
+    --sn-sp-5:20px; --sn-sp-6:24px; --sn-sp-8:32px; --sn-sp-10:40px;
+
+    /* layout */
+    --sn-topbar-h:56px; --sn-sidebar-w:248px; --sn-panel-w:350px;
+    --sn-content-max:1080px; --sn-content-max-wide:1280px;
+
+    /* motion */
+    --sn-t-fast:.15s; --sn-t-mid:.35s; --sn-t-amb:1.6s;
+    --sn-ease-out:cubic-bezier(.22,1,.36,1);
+    --sn-ease-pop:cubic-bezier(.2,.9,.3,1.1);
+
+    /* z-index */
+    --sn-z-nav:50; --sn-z-overlay:80; --sn-z-toast:100;
+  }
+
+  /* ---- LIGHT (default): beige paper, flat ---- */
+  :root, [data-theme="light"]{
+    --sn-bg:#fafaf8; --sn-bg-2:#f4f3ef; --sn-surface:#ffffff; --sn-surface-2:#faf9f6; --sn-inset:#f1f0ec;
+    --sn-ink:#0a0a0a; --sn-ink-2:#1c1c1e; --sn-ink-mute:#76767a; --sn-ink-faint:#b3b2ad;
+    --sn-rule:#e7e6e1; --sn-rule-2:#f0efea;
+    --sn-bubble-agent:#ffffff; --sn-bubble-user:#efece4;
+    --sn-send:#101114; --sn-on-send:#fafaf8;
+    --sn-work:#6f7e90; --sn-idle:#8aa58f; --sn-on:#4f8a5b;  /* on: a rule or a switch that holds */
+    --sn-danger:#b4433a;  /* destructive actions only: Delete */
+    --sn-dot:rgba(10,10,10,.09); --sn-link:rgba(10,10,10,.16);
+    /* the only color: muted brushed-metal, used on thin borders + faint glow */
+    --sn-edge:linear-gradient(135deg,rgba(108,124,150,.60),rgba(170,166,158,.12) 48%,rgba(176,148,116,.55));
+    --sn-edge-soft:linear-gradient(135deg,rgba(108,124,150,.30),rgba(170,166,158,.05) 50%,rgba(176,148,116,.26));
+    --sn-glow-cool:rgba(90,120,160,.06); --sn-glow-warm:rgba(190,160,120,.06);
+    --sn-shadow-s:0 1px 2px rgba(10,10,10,.05);
+    --sn-shadow:0 1px 2px rgba(10,10,10,.05),0 14px 34px rgba(10,10,10,.08);
+  }
+
+  /* ---- DARK: charcoal, faint glow ---- */
+  [data-theme="dark"]{
+    --sn-bg:#0a0a0c; --sn-bg-2:#0c0d10; --sn-surface:#131419; --sn-surface-2:#16171d; --sn-inset:#101116;
+    --sn-ink:#f2f2f0; --sn-ink-2:#c7c7cd; --sn-ink-mute:#83838d; --sn-ink-faint:#54545d;
+    --sn-rule:rgba(255,255,255,.075); --sn-rule-2:rgba(255,255,255,.045);
+    --sn-bubble-agent:#15161b; --sn-bubble-user:#1f2027;
+    --sn-send:#23242b; --sn-on-send:#f2f2f0;
+    --sn-work:#9aa6b8; --sn-idle:#3f5141; --sn-on:#6fbf86;
+    --sn-danger:#e0675d;
+    --sn-dot:rgba(255,255,255,.05); --sn-link:rgba(255,255,255,.14);
+    --sn-edge:linear-gradient(135deg,rgba(132,146,168,.65),rgba(86,92,104,.10) 46%,rgba(168,142,112,.50));
+    --sn-edge-soft:linear-gradient(135deg,rgba(132,146,168,.32),rgba(86,92,104,.06) 50%,rgba(168,142,112,.26));
+    --sn-glow-cool:rgba(90,110,140,.10); --sn-glow-warm:rgba(150,128,104,.07);
+    --sn-shadow-s:0 2px 8px rgba(0,0,0,.4);
+    --sn-shadow:0 20px 50px rgba(0,0,0,.5);
+  }
+}
+/* =====================================================================
+   Base
+   Reset, typography, body surface, scrollbars, a11y. Requires tokens.css.
+   ===================================================================== */
+
+@layer base {
+
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+  /* `hidden` hides, whatever display a component gives the element: important
+     in the first layer wins over every later layer's display */
+  [hidden] { display:none !important; }
+
+  html { scroll-behavior:smooth; }
+
+  body{
+    background:var(--sn-bg);
+    color:var(--sn-ink-2);
+    font-family:var(--sn-font);
+    font-size:16px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    min-height:100dvh; /* the visible viewport on phones,  */
+  }
+
+  /* dark surface gets a faint localized glow — atmosphere, never a fill */
+  [data-theme="dark"] body{
+    background:
+      radial-gradient(900px 600px at 80% -8%, var(--sn-glow-cool), transparent 60%),
+      radial-gradient(760px 560px at 6% 110%, var(--sn-glow-warm), transparent 60%),
+      var(--sn-bg);
+  }
+
+  a{ color:inherit; text-decoration:none; }
+  img, svg, video{ display:block; max-width:100%; }
+  button, input, textarea, select{ font:inherit; color:inherit; }
+
+  ::selection{ background:color-mix(in srgb, var(--sn-ink-mute) 24%, transparent); }
+
+  /* scrollbars */
+  *::-webkit-scrollbar{ width:9px; height:9px; }
+  *::-webkit-scrollbar-thumb{ background:var(--sn-rule); border-radius:var(--sn-r-sm); }
+  *::-webkit-scrollbar-thumb:hover{ background:var(--sn-ink-faint); }
+  *{ scrollbar-width:thin; scrollbar-color:var(--sn-rule) transparent; }
+
+  /* focus — keyboard only */
+  :focus-visible{ outline:2px solid var(--sn-ink-mute); outline-offset:2px; border-radius:var(--sn-r-xs); }
+
+  /* monospace helper */
+  .sn-mono{ font-family:var(--sn-mono); }
+
+  /* respect reduced motion globally */
+  @media (prefers-reduced-motion:reduce){
+    *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; scroll-behavior:auto !important; }
+  }
+}
+/* =====================================================================
+   Components
+   Shared UI primitives, token-driven, theme-aware. Requires tokens.css.
+   Class names prefixed .sn-* to coexist with a page's own CSS.
+   ===================================================================== */
+
+@keyframes sn-pulse{ 50%{ opacity:.35 } }
+@keyframes sn-bob{ 0%,100%{ transform:translateY(0); opacity:.4 } 50%{ transform:translateY(-5px); opacity:1 } }
+@keyframes sn-pop{ from{ transform:scale(.6); opacity:0 } to{ transform:scale(1); opacity:1 } }
+
+@layer components {
+
+  /* ---- the edge: the only color, a thin gradient border ---- */
+  .sn-edge{ position:relative }
+  .sn-edge::before{
+    content:""; position:absolute; inset:0; border-radius:inherit; padding:1px;
+    background:var(--sn-edge-soft);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none;
+  }
+  .sn-edge.sn-lit::before{ background:var(--sn-edge) } /* "needs you" emphasis */
+
+  /* ---- card ---- */
+  .sn-card{ background:var(--sn-surface); border:1px solid var(--sn-rule); border-radius:var(--sn-r-lg);
+    padding:var(--sn-sp-4); box-shadow:var(--sn-shadow-s) }
+  .sn-card--raised{ box-shadow:var(--sn-shadow) }
+
+  /* ---- buttons ---- */
+  .sn-btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font:600 13.5px/1 var(--sn-font);
+    color:var(--sn-ink); border:none; border-radius:var(--sn-r-sm); padding:11px 18px; cursor:pointer;   /* one button corner, every screen */
+    transition:transform var(--sn-t-fast), background var(--sn-t-fast) }
+  .sn-btn:hover{ transform:translateY(-1px) }
+  .sn-btn--primary{ background:var(--sn-send); color:var(--sn-on-send) }       /* solid ink/graphite */
+  .sn-btn--ghost{ background:transparent; color:var(--sn-ink); border:1px solid var(--sn-rule) }
+  .sn-btn--icon{ width:36px; height:36px; padding:0; justify-content:center; border-radius:var(--sn-r-sm);
+    background:var(--sn-surface); border:1px solid var(--sn-rule); color:var(--sn-ink-mute); font-size:15px }
+  .sn-btn--icon:hover{ color:var(--sn-ink) }
+  .sn-send{ width:38px; height:38px; border-radius:var(--sn-r-sm); background:var(--sn-send); color:var(--sn-on-send);
+    font-size:17px; display:grid; place-items:center; border:none; cursor:pointer }
+  .sn-send.is-stop{ background:var(--sn-ink-faint); font-size:13px }
+  .sn-send.is-stop:hover{ background:#c44; color:#fff }
+
+  /* ---- input ---- */
+  .sn-field{ display:flex; align-items:center; gap:8px; border:1px solid var(--sn-rule); border-radius:var(--sn-r-lg);
+    background:var(--sn-surface); padding:6px 6px 6px 14px }
+  .sn-field:focus-within{ border-color:var(--sn-ink-faint) }
+  /* 5px above and below: a field is about 40px tall, as the panel fields are (owner, 2026-11-07:
+     the sign-in settings fields looked narrow beside the panel ones) */
+  .sn-field input, .sn-field textarea{ flex:1; background:none; border:none; outline:none; color:var(--sn-ink); font:400 14px var(--sn-font); padding:5px 0 }
+  .sn-field textarea{ resize:vertical; min-height:72px; padding:6px 0; line-height:1.5 }
+  .sn-field input::placeholder, .sn-field textarea::placeholder{ color:var(--sn-ink-faint) }
+  /* a choice from a list inside a field: no system-white box, a chevron of the
+     ink colour; the open list follows the theme through color-scheme */
+  .sn-field select, .sn-select{ flex:1; appearance:none; -webkit-appearance:none; background:transparent; border:none; outline:none;
+    color:var(--sn-ink); font:400 14px var(--sn-font); padding:6px 22px 6px 0; cursor:pointer; color-scheme:light;
+    background-image:linear-gradient(45deg, transparent 50%, var(--sn-ink-mute) 50%), linear-gradient(135deg, var(--sn-ink-mute) 50%, transparent 50%);
+    background-position:calc(100% - 9px) 50%, calc(100% - 4px) 50%; background-size:5px 5px; background-repeat:no-repeat }
+  [data-theme="dark"] .sn-field select, [data-theme="dark"] .sn-select{ color-scheme:dark }
+  .sn-field select option, .sn-select option{ background:var(--sn-surface); color:var(--sn-ink) }
+
+  /* ---- toggle ---- */
+  .sn-tgl{ width:46px; height:26px; border-radius:var(--sn-r-pill); background:var(--sn-inset);
+    border:1px solid var(--sn-rule); position:relative; cursor:pointer; transition:.25s; flex:0 0 auto }
+  .sn-tgl__knob{ position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%;
+    background:var(--sn-surface); box-shadow:var(--sn-shadow-s); transition:.25s }
+  .sn-tgl.is-on{ background:var(--sn-surface-2) }
+  .sn-tgl.is-on .sn-tgl__knob{ left:22px }
+
+  /* ---- segmented control ---- */
+  .sn-seg{ display:inline-flex; gap:3px; padding:4px; background:var(--sn-inset);
+    border:1px solid var(--sn-rule); border-radius:var(--sn-r-md) }
+  .sn-seg button{ font:500 12.5px var(--sn-font); color:var(--sn-ink-mute); border:none; background:transparent;
+    border-radius:var(--sn-r-sm); padding:6px 13px; cursor:pointer }
+  .sn-seg button.is-on{ background:var(--sn-surface); color:var(--sn-ink); box-shadow:var(--sn-shadow-s) }
+  /* ---- app tiles: one per module, a Lucide line icon on a square, the name under it, a
+     status dot in the corner; colour only in the dot. Off: the tile goes pale, no dot.
+     <div class="sn-apps"><button class="sn-app sn-app--on"><span class="sn-app__ico"><i data-lucide="brain"></i></span>
+       <span class="sn-app__dot"></span><span class="sn-app__name">Memory</span></button></div> */
+  .sn-apps{ display:grid; grid-template-columns:repeat(auto-fill, minmax(104px, 1fr)); gap:8px }
+  .sn-app{ position:relative; display:flex; flex-direction:column; align-items:center; gap:10px;
+    padding:14px 6px 12px; border:0; background:none; border-radius:var(--sn-r-lg); cursor:pointer;
+    transition:background var(--sn-t-fast) }
+  .sn-app:hover{ background:var(--sn-inset) }
+  .sn-app[disabled]{ cursor:default } .sn-app[disabled]:hover{ background:none }
+  .sn-app__ico{ display:grid; place-items:center; width:64px; height:64px; border-radius:var(--sn-r-xl);
+    background:var(--sn-bubble-user); color:var(--sn-ink) }
+  .sn-app__ico svg{ width:30px; height:30px; stroke-width:1.6 }
+  .sn-app__name{ font:500 13px/1.3 var(--sn-font); color:var(--sn-ink-2); text-align:center }
+  .sn-app__note{ font-size:11.5px; color:var(--sn-ink-mute); text-align:center; margin-top:-6px }
+  .sn-app__dot{ position:absolute; top:12px; left:calc(50% + 22px); width:10px; height:10px;
+    border-radius:var(--sn-r-pill); border:2px solid var(--sn-bg) }
+  .sn-app--on  .sn-app__dot{ background:var(--sn-on) }
+  .sn-app--err .sn-app__dot{ background:var(--sn-danger) }
+  .sn-app--off .sn-app__ico{ background:transparent; box-shadow:inset 0 0 0 1.5px var(--sn-rule); color:var(--sn-ink-faint) }
+  .sn-app--off .sn-app__name{ color:var(--sn-ink-mute) }
+  .sn-app--off .sn-app__dot{ display:none }
+  /* choosing, before anything runs: no status dot. Chosen is a filled tile, not chosen an
+     outline (sn-app--off); a fixed one (always there) is filled and cannot be pressed. */
+  .sn-app--chosen .sn-app__ico{ background:var(--sn-ink); color:var(--sn-bg) }
+  .sn-app--chosen .sn-app__dot, .sn-app--fixed .sn-app__dot{ display:none }
+  .sn-app--fixed{ cursor:default } .sn-app--fixed:hover{ background:none }
+  /* ---- sliding switch: equal parts, a thumb slides under the chosen one ----
+     <div class="sn-seg sn-seg--slide" style="--n:3"><span class="sn-seg__thumb"></span><button>A</button>...</div>
+     The page sets --i (the index of the chosen part) when the choice changes. */
+  .sn-seg--slide{ position:relative; display:grid; grid-template-columns:repeat(var(--n), 1fr); gap:0; --i:0 }
+  .sn-seg--slide .sn-seg__thumb{ position:absolute; top:4px; bottom:4px; left:4px; width:calc((100% - 8px) / var(--n));
+    background:color-mix(in srgb, var(--sn-ink) 13%, transparent); border-radius:var(--sn-r-sm);
+    transform:translateX(calc(var(--i) * 100%)); transition:transform var(--sn-t-mid) var(--sn-ease-out) }
+  .sn-seg--slide button{ position:relative; z-index:1; padding:9px 6px; transition:color var(--sn-t-fast) }
+  .sn-seg--slide button.is-on{ background:transparent; box-shadow:none }
+  @media (prefers-reduced-motion:reduce){ .sn-seg--slide .sn-seg__thumb{ transition:none } }
+
+  /* ---- switch: a real checkbox that looks like a toggle ----
+     <label class="sn-switch"><input type="checkbox" role="switch"> Label</label>
+     Unlike .sn-tgl it is a form field: keyboard, screen readers and :checked work. */
+  .sn-switch{ display:inline-flex; align-items:center; gap:10px; cursor:pointer; font:400 14px var(--sn-font); color:var(--sn-ink-2) }
+  .sn-switch input{ appearance:none; -webkit-appearance:none; margin:0; flex:0 0 auto; width:38px; height:22px;
+    border-radius:var(--sn-r-pill); background:var(--sn-rule); border:1px solid var(--sn-rule); position:relative; cursor:pointer;
+    transition:background var(--sn-t-fast), border-color var(--sn-t-fast) }
+  .sn-switch input::after{ content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%;
+    background:var(--sn-surface); box-shadow:var(--sn-shadow-s); transition:left var(--sn-t-fast) var(--sn-ease-out) }
+  .sn-switch input:checked{ background:var(--sn-send); border-color:var(--sn-send) }
+  .sn-switch input:checked::after{ left:18px; background:var(--sn-on-send) }
+  .sn-switch input:focus-visible{ outline:2px solid var(--sn-ink-mute); outline-offset:2px }
+  .sn-switch input:disabled{ opacity:.4; cursor:default }
+
+  /* ---- status: pills + dots ---- */
+  .sn-pill{ font:500 10.5px var(--sn-mono); letter-spacing:.02em; padding:4px 11px; border-radius:var(--sn-r-pill);
+    background:var(--sn-inset); color:var(--sn-ink-mute); border:1px solid var(--sn-rule-2) }
+  .sn-dot{ display:inline-block; width:8px; height:8px; border-radius:var(--sn-r-xs); background:var(--sn-ink-faint) }
+  .sn-dot--work{ background:var(--sn-work); box-shadow:0 0 7px var(--sn-work); animation:sn-pulse var(--sn-t-amb) infinite }
+  .sn-dot--idle{ background:var(--sn-idle) }
+
+  /* ---- sidebar nav item ---- */
+  .sn-nav-it{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:var(--sn-r-sm);
+    color:var(--sn-ink-mute); font:400 13.5px var(--sn-font); cursor:pointer; transition:background var(--sn-t-fast) }
+  .sn-nav-it:hover{ background:var(--sn-surface); color:var(--sn-ink-2) }
+  .sn-nav-it.is-on{ background:var(--sn-surface); color:var(--sn-ink); box-shadow:var(--sn-shadow-s) }
+  button.sn-nav-it{ width:100%; border:0; background:none; text-align:left }
+
+  /* ---- avatar ---- */
+  .sn-av{ width:30px; height:30px; border-radius:var(--sn-r-sm); background:var(--sn-surface-2);
+    border:1px solid var(--sn-rule); position:relative; display:grid; place-items:center;
+    font:600 11px var(--sn-mono); color:var(--sn-ink-2) }
+  .sn-av__st{ position:absolute; right:-2px; bottom:-2px; width:10px; height:10px; border-radius:50%; border:2px solid var(--sn-bg) }
+  .sn-av__st--work{ background:var(--sn-work) }
+  .sn-av__st--idle{ background:var(--sn-idle) }
+
+  /* ---- progress bar (edge fill) ---- */
+  .sn-bar{ height:4px; border-radius:3px; background:var(--sn-inset); overflow:hidden }
+  .sn-bar > i{ display:block; height:100%; background:var(--sn-edge); border-radius:3px }
+
+  /* ---- chip / tag ---- */
+  .sn-chip{ font:400 11px var(--sn-font); color:var(--sn-ink-mute); border:1px solid var(--sn-rule);
+    border-radius:var(--sn-r-pill); padding:4px 10px }
+
+  /* ---- tag: a status word in the interface's own font (sn-pill is mono, for codes) ---- */
+  .sn-tag{ display:inline-flex; align-items:center; gap:6px; font:500 12px var(--sn-font); color:var(--sn-ink-2);
+    padding:3px 10px; border-radius:var(--sn-r-pill); background:var(--sn-inset); white-space:nowrap }
+  .sn-tag::before{ content:""; width:6px; height:6px; border-radius:50%; background:var(--sn-ink-faint) }
+  .sn-tag--work::before{ background:var(--sn-work) }
+  .sn-tag--idle::before{ background:var(--sn-idle) }
+  .sn-tag--need{ background:var(--sn-send); color:var(--sn-on-send) } .sn-tag--need::before{ background:var(--sn-on-send) }
+  /* a tag that switches something on and off: a button, off reads muted */
+  button.sn-tag{ border:0; cursor:pointer } button.sn-tag:hover{ color:var(--sn-ink) }
+  .sn-tag.is-off{ color:var(--sn-ink-mute) }
+  .sn-tag--on::before{ background:var(--sn-on) }
+
+  /* ---- chat: message bubbles (both dark/both light, different shade) ---- */
+  .sn-chat{ display:flex; flex-direction:column; gap:10px }
+  .sn-msg{ max-width:86%; padding:4px 8px; font:400 14px/1.5 var(--sn-font); border-radius:var(--sn-r-lg) }
+  .sn-msg--agent{ align-self:flex-start; background:var(--sn-bubble-agent); color:var(--sn-ink-2);
+    border-bottom-left-radius:5px; border:1px solid var(--sn-rule); box-shadow:var(--sn-shadow-s) }
+  .sn-msg--agent b{ color:var(--sn-ink) }
+  .sn-msg--user{ align-self:flex-end; background:var(--sn-bubble-user); color:var(--sn-ink);
+    border-bottom-right-radius:5px; border:1px solid var(--sn-rule) }
+
+  /* ---- thinking indicator ---- */
+  .sn-thinking{ display:inline-flex; gap:5px; align-items:center; padding:10px 13px;
+    background:var(--sn-bubble-agent); border:1px solid var(--sn-rule); border-radius:var(--sn-r-lg) }
+  .sn-thinking > i{ width:6px; height:6px; border-radius:50%; background:var(--sn-ink-faint); animation:sn-bob 1.2s infinite }
+  .sn-thinking > i:nth-child(2){ animation-delay:.15s }
+  .sn-thinking > i:nth-child(3){ animation-delay:.3s }
+
+  /* ---- a reply in flight: one line of text with a light passing over it, and
+     the seconds after 10 s (owner, 2026-09-10). Built once; only the text changes,
+     so the sweep never restarts mid-pass.
+     <span class="sn-think"><span class="sn-think__label">Thinking</span><span class="sn-think__time"> 19s</span></span> */
+  .sn-think{ display:inline-flex; align-items:baseline; gap:8px }
+  .sn-think__label{ font-weight:500;
+    background:linear-gradient(90deg, var(--sn-ink-faint) 0%, var(--sn-ink-faint) 35%, var(--sn-ink) 50%, var(--sn-ink-faint) 65%, var(--sn-ink-faint) 100%);
+    background-size:250% 100%; -webkit-background-clip:text; background-clip:text; color:transparent;
+    animation:sn-think-sweep 1.8s linear infinite }
+  .sn-think__label.is-offline{ animation:none; background:none; color:var(--sn-danger) }
+  .sn-think__time{ font-family:var(--sn-mono); font-size:11px; color:var(--sn-ink-faint) }
+  @keyframes sn-think-sweep{ from{ background-position:100% 0 } to{ background-position:0% 0 } }
+  @media (prefers-reduced-motion: reduce){ .sn-think__label{ animation:none; background:none; color:var(--sn-ink-mute) } }
+
+  /* ---- the live line of a reply in flight (owner, 2026-10-30: "как сделал бы
+     Apple"): Stop is a fixed circle at the START, so a long tool line can never
+     push it around; what the agent does is a short verb, its detail a quiet second
+     line cut to one line; the seconds sit at the right edge.
+     <div class="sn-live"><button class="sn-live__stop"><span class="turn-stop__sq"></span></button>
+       <div class="sn-live__t"><div class="sn-live__row"><span class="sn-live__label sn-shimmer">Searching the web</span>
+       <span class="sn-live__time">12s</span></div><div class="sn-live__detail">lighthouse news</div></div></div> */
+  .sn-live{ display:flex; align-items:center; gap:12px; max-width:440px; min-height:36px }
+  .sn-live__stop{ flex:0 0 auto; width:28px; height:28px; padding:0; border-radius:50%; border:1px solid var(--sn-rule); background:var(--sn-surface);
+    color:var(--sn-ink-2); display:grid; place-items:center; cursor:pointer; transition:border-color var(--sn-t-fast), color var(--sn-t-fast) }
+  .sn-live__stop:hover:not(:disabled){ border-color:var(--sn-ink-faint); color:var(--sn-ink) }
+  .sn-live__stop:disabled{ cursor:default; color:transparent }
+  .sn-live__stop .turn-stop__sq{ width:9px; height:9px }
+  .sn-live__t{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px }
+  .sn-live__row{ display:flex; align-items:baseline; gap:10px; min-width:0 }
+  .sn-live__label{ flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:500 13.5px/1.4 var(--sn-font) }
+  .sn-live__time{ margin-left:auto; flex:0 0 auto; font:11px var(--sn-mono); color:var(--sn-ink-faint) }
+  .sn-live__detail{ font-size:12px; line-height:1.4; color:var(--sn-ink-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+  .sn-live__recent{ margin-top:4px; font-size:12px; line-height:1.55; color:var(--sn-ink-mute) }
+  .sn-live__recent > div{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+  /* marks on the person's own message: waiting behind the running turn (with
+     its cancel), passed into the running turn, and on a stopped answer */
+  .sn-qchip{ display:block; text-align:right; margin:4px -2px -3px 0; font-size:11.5px; line-height:1.2; color:var(--sn-ink-mute); white-space:nowrap }
+  .sn-qchip button{ border:0; background:none; color:inherit; cursor:pointer; font-size:14px; line-height:1; padding:0 2px; vertical-align:-1px }
+  .sn-qchip button:hover{ color:var(--sn-ink) }
+  .sn-steer-status{ display:block; margin-top:4px; font:500 11px/1.4 var(--sn-mono); color:var(--sn-ink-mute) }
+  .sn-stopped{ display:block; margin-top:6px; font:500 11px/1.4 var(--sn-mono); color:var(--sn-ink-mute) }
+  /* The light passing over the text, without the motion: the page moves it from
+     JavaScript (Web Animations), because base.css stops every CSS animation under
+     prefers-reduced-motion, and this one is the signal that the agent is alive,
+     not decoration (owner, 2026-10-30; the old page's sync spinner does the same). */
+  .sn-shimmer{ background:linear-gradient(90deg, var(--sn-ink-faint) 0%, var(--sn-ink-faint) 35%, var(--sn-ink) 50%, var(--sn-ink-faint) 65%, var(--sn-ink-faint) 100%);
+    background-size:250% 100%; -webkit-background-clip:text; background-clip:text; color:transparent }
+
+  /* ---- Stop on the reply it stops: a square, the word only in the tooltip
+     (owner, 2026-09-18); a queued message gets a cross instead ---- */
+  .turn-stop{ display:inline-flex; align-items:center; justify-content:center; gap:6px; margin-left:10px; padding:7px; border:1px solid transparent;
+    border-radius:6px; background:transparent; color:var(--sn-ink-mute); font:500 11px/1.4 var(--sn-font); cursor:pointer; vertical-align:middle }
+  .turn-stop:hover:not(:disabled){ color:var(--sn-ink); border-color:var(--sn-ink-faint) }
+  .turn-stop:disabled{ opacity:.5; cursor:default }
+  .turn-stop__sq{ width:12px; height:12px; border-radius:2px; background:currentColor }
+  .turn-stop--queued{ font-size:20px; line-height:1 }
+
+  /* ---- composer chips: files and long pastes in the tray, a pasted chip opened to
+     edit, and in the thread a pasted block folded and the sent files as links ---- */
+  /* chips above the text: long pastes (real) and files/images (a preview previously) */
+  .cmp__tray { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 2px 10px; max-height: 30vh; overflow-y: auto; }
+  .cmp__tray[hidden], .cmp__peek[hidden] { display: none; }
+  .cmp-chip { display: flex; align-items: center; gap: 8px; max-width: 240px; padding: 6px 6px 6px 8px; border: 1px solid var(--sn-rule); border-radius: var(--sn-r-md); background: var(--sn-bg-2); }
+  .cmp-chip[data-kind="paste"] { cursor: pointer; }
+  .cmp-chip[data-kind="paste"]:hover { border-color: var(--sn-ink-faint); }
+  .cmp-chip__ic { width: 32px; height: 32px; flex: 0 0 auto; border-radius: var(--sn-r-sm); background: var(--sn-inset); display: grid; place-items: center; color: var(--sn-ink-mute); }
+  .cmp-chip__ic svg { width: 16px; height: 16px; }
+  .cmp-chip__img { width: 32px; height: 32px; flex: 0 0 auto; border-radius: var(--sn-r-sm); object-fit: cover; }
+  .cmp-chip__t { display: flex; flex-direction: column; min-width: 0; }
+  .cmp-chip__t b { font-size: 12.5px; font-weight: 600; color: var(--sn-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cmp-chip__t small { font-size: 11px; color: var(--sn-ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cmp-chip__x { width: 22px; height: 22px; flex: 0 0 auto; border: none; border-radius: 50%; background: transparent; color: var(--sn-ink-mute); cursor: pointer; font-size: 16px; line-height: 1; }
+  .cmp-chip__x:hover { background: var(--sn-inset); color: var(--sn-ink); }
+  .cmp-chip.is-bad { border-color: var(--sn-danger); }
+  .cmp-chip.is-bad small { color: var(--sn-danger); }
+
+  /* a pasted chip opened to read or edit it */
+  .cmp__peek { border: 1px solid var(--sn-rule); border-radius: var(--sn-r-md); background: var(--sn-bg-2); margin-bottom: 10px; }
+  .cmp-peek__bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; font-size: 12px; color: var(--sn-ink-mute); border-bottom: 1px solid var(--sn-rule); }
+  .cmp-peek__bar button { border: 1px solid var(--sn-rule); background: var(--sn-surface); color: var(--sn-ink); border-radius: var(--sn-r-sm); padding: 4px 10px; cursor: pointer; font-size: 12px; }
+  .cmp-peek__ta { display: block; width: 100%; box-sizing: border-box; min-height: 140px; max-height: 30vh; resize: vertical; border: none; outline: none; background: none; color: var(--sn-ink); font: 12.5px/1.45 var(--sn-mono); padding: 10px; }
+
+  .cmp-pasted { margin-top: 6px; border: 1px solid var(--sn-rule); border-radius: var(--sn-r-sm); background: var(--sn-bg-2); white-space: normal; }
+  .cmp-pasted summary { cursor: pointer; padding: 6px 10px; font-size: 12px; color: var(--sn-ink-mute); }
+  .cmp-pasted pre { margin: 0; padding: 8px 10px; max-height: 260px; overflow: auto; font: 12px/1.45 var(--sn-mono); white-space: pre-wrap; border-top: 1px solid var(--sn-rule); }
+  .cmp-sent { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; white-space: normal; }
+  .cmp-sent .cmp-chip { max-width: 220px; }
+  /* a sent file is a link that opens it */
+  .cmp-sent a.cmp-chip { color: inherit; text-decoration: none; }
+  .cmp-sent a.cmp-chip:hover { border-color: var(--sn-ink-faint); }
+  .cmp-sent__note { flex-basis: 100%; font-size: 11px; color: var(--sn-ink-faint); }
+
+
+  /* destructive actions only (Delete), as the last button of a confirm */
+  .sn-btn--danger{ background:var(--sn-danger); color:#fff }
+  /* an icon with no frame, in a header or a toolbar (the panel toggle, a
+     month's chevrons, a drawer's close): one size, one corner, one hover.
+     Four hand-made variants of it were counted in the Workspace (round 3). */
+  .sn-btn--bare, .sn-drawer__x{ width:32px; height:32px; display:inline-grid; place-items:center; padding:0; border:0;
+    border-radius:var(--sn-r-sm); background:none; color:var(--sn-ink-mute); cursor:pointer }
+  .sn-btn--bare:hover, .sn-drawer__x:hover{ background:var(--sn-inset); color:var(--sn-ink) }
+
+  /* ---- dialog: a question that must be answered, in the middle of the screen
+     (a native <dialog> opened with showModal; margin:auto centres it past a page's
+     reset). Not a row inside a card: the
+     admin asked "Pause all agents?" in the card itself (owner, 2026-10-30). */
+  .sn-dialog{ margin:auto; width:min(400px, calc(100vw - 32px)); padding:24px 24px 20px; border:1px solid var(--sn-rule); border-radius:var(--sn-r-xl);
+    background:var(--sn-surface); color:var(--sn-ink-2); box-shadow:var(--sn-shadow) }
+  .sn-dialog::backdrop{ background:rgba(0,0,0,.45) }
+  .sn-dialog__q{ font:650 17px/1.3 var(--sn-font); color:var(--sn-ink); letter-spacing:-.01em; margin:0 }
+  .sn-dialog__note{ font:400 14px/1.5 var(--sn-font); color:var(--sn-ink-mute); margin:8px 0 0 }
+  .sn-dialog__row{ display:flex; justify-content:flex-end; gap:8px; margin-top:24px }
+
+  /* ---- page grammar: every screen of a service is built from these ----
+     A page is a large title and one column of one width; a section is a plain
+     title over a grouped list; a row is one thing with one line under it; a
+     section with nothing in it is one sentence, never a skeleton. One font,
+     three sizes (28 title, 15 body, 13 secondary), no mono, no capitals. */
+  .sn-page{ max-width:880px; margin:0 auto; padding:32px 24px 64px }
+  .sn-page--wide{ max-width:var(--sn-content-max-wide) }
+  .sn-page__head{ display:flex; align-items:center; gap:16px; margin-bottom:8px }
+  .sn-page__title{ flex:1; min-width:0; font:650 28px/1.2 var(--sn-font); color:var(--sn-ink); letter-spacing:-.01em }
+  /* the product's logotype: its name, and under it what it is */
+  /* the second line's letters spread edge to edge, so both lines are the same width in any font;
+     the name's last letter drops its trailing spacing so its visible edge is the column's */
+  .sn-logo{ display:inline-flex; flex-direction:column; gap:5px; line-height:1 }
+  .sn-logo b{ font:750 26px/1 var(--sn-font); letter-spacing:.12em; margin-right:-.12em; color:var(--sn-ink) }
+  .sn-logo small{ display:flex; justify-content:space-between; padding:0 .15em; font:600 10px/1 var(--sn-font); text-transform:uppercase; color:var(--sn-ink-mute) }
+  /* the "?" that opens a page's help: a small ringed button, with a larger touch area */
+  .sn-help{ position:relative; width:24px; height:24px; display:inline-grid; place-items:center; flex:none; padding:0;
+    border:1px solid var(--sn-rule); border-radius:50%; background:transparent; color:var(--sn-ink-2);
+    font:600 13px/1 var(--sn-font); cursor:pointer }
+  .sn-help::after{ content:""; position:absolute; inset:-8px }
+  .sn-help:hover{ color:var(--sn-ink); border-color:var(--sn-ink-faint) }
+  /* a drawer for reading: wider, and Markdown set as text */
+  .sn-md{ font:400 14px/1.6 var(--sn-font); color:var(--sn-ink-2) }
+  .sn-md h1{ font:650 19px/1.3 var(--sn-font); color:var(--sn-ink); margin:4px 0 12px }
+  .sn-md h2{ font:600 15px/1.35 var(--sn-font); color:var(--sn-ink); margin:22px 0 8px }
+  .sn-md h3{ font:600 14px/1.35 var(--sn-font); color:var(--sn-ink); margin:16px 0 6px }
+  .sn-md p, .sn-md ul, .sn-md ol, .sn-md table, .sn-md pre{ margin:0 0 10px }
+  .sn-md ul, .sn-md ol{ padding-left:20px }
+  .sn-md li{ margin-bottom:4px }
+  .sn-md strong{ color:var(--sn-ink); font-weight:600 }
+  .sn-md a{ color:var(--sn-link) }
+  .sn-md code{ font:12.5px/1.5 var(--sn-mono); background:var(--sn-inset); padding:1px 5px; border-radius:var(--sn-r-xs) }
+  .sn-md pre{ background:var(--sn-inset); padding:10px 12px; border-radius:var(--sn-r-sm); overflow-x:auto }
+  .sn-md pre code{ background:none; padding:0; white-space:pre }
+  .sn-md table{ width:100%; border-collapse:collapse; font-size:13px }
+  .sn-md th, .sn-md td{ text-align:left; vertical-align:top; padding:6px 8px 6px 0; border-bottom:1px solid var(--sn-rule-2) }
+  .sn-md th{ color:var(--sn-ink); font-weight:600 }
+  .sn-page__sub{ font:400 15px/1.45 var(--sn-font); color:var(--sn-ink-mute); margin-top:4px }
+  .sn-section{ margin-top:32px }
+  .sn-section__title{ display:flex; align-items:baseline; gap:8px; font:600 15px/1.3 var(--sn-font); color:var(--sn-ink); margin:0 4px 10px }
+  .sn-section__title small{ font-weight:400; color:var(--sn-ink-mute) }
+  .sn-section__title a, .sn-section__title button{ margin-left:auto; font:400 13px var(--sn-font); color:var(--sn-ink-mute); background:none; border:0; cursor:pointer }
+  .sn-section__title a:hover, .sn-section__title button:hover{ color:var(--sn-ink) }
+  .sn-group{ background:var(--sn-surface); border-radius:var(--sn-r-lg); box-shadow:var(--sn-shadow-s); overflow:hidden }
+  .sn-row{ display:flex; align-items:center; gap:12px; min-height:56px; padding:10px 16px; color:inherit; text-align:left; width:100%;
+    background:none; border:0; font:inherit }
+  .sn-row + .sn-row{ box-shadow:inset 0 1px 0 var(--sn-rule-2) }
+  a.sn-row, button.sn-row, label.sn-row{ cursor:pointer }
+  a.sn-row:hover, button.sn-row:hover{ background:var(--sn-surface-2) }
+  .sn-row__main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px }
+  .sn-row__title{ font:500 15px/1.35 var(--sn-font); color:var(--sn-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+  .sn-row__sub{ font:400 13px/1.4 var(--sn-font); color:var(--sn-ink-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+  .sn-row__sub--wrap, .sn-row__title--wrap{ white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical }
+  .sn-row__meta{ flex:0 0 auto; font:400 13px var(--sn-font); color:var(--sn-ink-mute); font-variant-numeric:tabular-nums }
+  .sn-row__chev{ flex:0 0 auto; width:8px; height:8px; border-right:1.5px solid var(--sn-ink-faint); border-top:1.5px solid var(--sn-ink-faint); transform:rotate(45deg); margin-left:2px }
+  .sn-row__icon{ flex:0 0 auto; width:32px; height:32px; border-radius:var(--sn-r-sm); display:grid; place-items:center; background:var(--sn-inset); color:var(--sn-ink-mute) }
+  .sn-ava{ position:relative; flex:0 0 auto; width:36px; height:36px; border-radius:50%; display:grid; place-items:center; overflow:hidden;
+    background:var(--sn-inset); color:var(--sn-ink-mute); font:600 14px var(--sn-font) }
+  .sn-ava img{ width:100%; height:100%; object-fit:cover }
+  .sn-ava--l{ width:72px; height:72px; font-size:28px }
+  .sn-ava--s{ width:28px; height:28px; font-size:12px }
+  .sn-ava__st{ position:absolute; right:0; bottom:0; width:11px; height:11px; border-radius:50%; background:var(--sn-work); box-shadow:0 0 0 2px var(--sn-surface) }
+  .sn-status{ display:inline-flex; align-items:center; gap:6px; font:400 13px var(--sn-font); color:var(--sn-ink-mute) }
+  .sn-status::before{ content:""; width:7px; height:7px; border-radius:50%; background:var(--sn-ink-faint) }
+  .sn-status--work{ color:var(--sn-ink-2) }
+  .sn-status--work::before{ background:var(--sn-work) }
+  .sn-tiles{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:10px }
+  .sn-tile{ display:flex; flex-direction:column; gap:4px; padding:14px 16px; background:var(--sn-surface); border-radius:var(--sn-r-lg); box-shadow:var(--sn-shadow-s); min-width:0 }
+  .sn-tile b{ font:500 15px/1.35 var(--sn-font); color:var(--sn-ink) }
+  .sn-tile small{ font:400 13px/1.4 var(--sn-font); color:var(--sn-ink-mute); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+  .sn-empty{ padding:14px 4px; font:400 15px/1.45 var(--sn-font); color:var(--sn-ink-mute) }
+  /* a drawer: what belongs to one thing on the page (a day, a row), from the
+     right, over the page; the page under it stays where it was */
+  .sn-drawer{ position:fixed; top:0; right:0; bottom:0; width:min(560px, 100vw); z-index:var(--sn-z-overlay); display:flex; flex-direction:column;
+    background:var(--sn-surface); border-left:1px solid var(--sn-rule); box-shadow:var(--sn-shadow); transform:translateX(100%); visibility:hidden;
+    transition:transform .2s ease, visibility .2s }
+  /* visible at once when opening, so focus() can land inside; closing keeps the delay */
+  .sn-drawer.is-open{ transform:none; visibility:visible; transition:transform .2s ease, visibility 0s }
+  .sn-drawer__head{ display:flex; align-items:center; gap:8px; padding:16px 16px 12px 20px; border-bottom:1px solid var(--sn-rule-2) }
+  .sn-drawer__head h3{ flex:1; margin:0; font:600 16px/1.3 var(--sn-font); color:var(--sn-ink) }
+  .sn-drawer__x{ font-size:20px; line-height:1 }   /* a .sn-btn--bare with the close glyph */
+  .sn-drawer__body{ flex:1; min-height:0; overflow-y:auto; padding:12px 16px 24px }
+  /* a toast: the word after an action ("Saved"), floating, gone by itself */
+  .sn-toast{ position:fixed; left:50%; bottom:24px; transform:translate(-50%, 8px); opacity:0; pointer-events:none; z-index:var(--sn-z-toast);
+    background:var(--sn-send); color:var(--sn-on-send); font:500 13.5px var(--sn-font); padding:10px 16px; border-radius:var(--sn-r-pill);
+    box-shadow:var(--sn-shadow); white-space:nowrap; max-width:calc(100vw - 32px); overflow:hidden; text-overflow:ellipsis; transition:opacity .18s, transform .18s }
+  .sn-toast.is-on{ opacity:1; transform:translate(-50%, 0) }
+  /* a count badge (unread, waiting): the ink inverted, so it stands out on either
+     theme; graphite on a near-black page all but vanished (owner, 2026-10-30) */
+  .sn-unread{ display:inline-block; box-sizing:border-box; min-width:18px; height:18px; padding:0 5px;
+    border-radius:9px; background:var(--sn-ink); color:var(--sn-bg);
+    font:600 11px/18px var(--sn-font); text-align:center; font-variant-numeric:tabular-nums }
+  /* a tab bar: the sections of an app at the bottom of a phone screen; the page
+     decides when it shows */
+  .sn-tabbar{ display:flex; border-top:1px solid var(--sn-rule); background:var(--sn-bg);
+    padding:4px 4px calc(4px + env(safe-area-inset-bottom)) }
+  .sn-tabbar__i{ flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 2px;
+    border:0; background:none; color:var(--sn-ink-mute); font:500 11px/1.2 var(--sn-font); cursor:pointer; border-radius:var(--sn-r-sm) }
+  .sn-tabbar__i svg{ width:22px; height:22px }
+  .sn-tabbar__i.is-active{ color:var(--sn-ink) }
+  .sn-tabbar__i:focus-visible{ outline:2px solid var(--sn-ink-mute); outline-offset:-2px }
+  @media (max-width:760px){
+    .sn-page{ padding:16px 16px 48px }
+    .sn-page__title{ font-size:24px }
+    .sn-section{ margin-top:24px }
+  }
+
+  /* ---- canvas node pop-in (apply .sn-pop to newly added nodes) ---- */
+  .sn-pop{ animation:sn-pop var(--sn-t-mid) var(--sn-ease-pop) both }
+}
+
+/* Local additions, to be taken into the kit itself.
+   --sn-content-max-dash: the width of a dashboard page; both router pages use it, so
+   switching between them does not move the page.
+   An on switch is the ink colour in
+   both themes. The kit paints it --sn-send, near-black in the dark theme, where on
+   looked like off.
+   --sn-ctl-h, --sn-ctl-h-s: one height for every control (buttons, fields, lists,
+   segmented switches), the small one inside table rows; and one size of switch. */
+@layer tokens {
+  :root{ --sn-content-max-dash:1440px; --sn-ctl-h:36px; --sn-ctl-h-s:28px }
+}
+@layer components {
+  .sn-switch input:checked{ background:var(--sn-ink); border-color:var(--sn-ink) }
+  .sn-switch input:checked::after{ background:var(--sn-bg) }
+  .sn-switch input{ width:42px; height:24px }
+  .sn-switch input::after{ width:18px; height:18px; top:2px; left:2px }
+  .sn-switch input:checked::after{ left:20px }
+  .sn-btn{ height:var(--sn-ctl-h); padding-top:0; padding-bottom:0 }
+  .sn-field{ height:var(--sn-ctl-h); padding-top:0; padding-bottom:0 }
+  .sn-field input{ height:100%; padding-top:0; padding-bottom:0 }
+  .sn-seg{ height:var(--sn-ctl-h); padding:3px; align-items:stretch }
+  .sn-seg button{ padding-top:0; padding-bottom:0 }
+  .sn-seg--slide .sn-seg__thumb{ top:3px; bottom:3px; left:3px; width:calc((100% - 6px) / var(--n)) }
+  .sn-seg--slide button{ padding-top:0; padding-bottom:0 }
+}

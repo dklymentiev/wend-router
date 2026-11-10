@@ -1,0 +1,16 @@
+.git
+.github
+release
+docs
+scripts
+tests
+wend
+wend.exe
+*.exe
+wend.env
+keys.dat
+master.key
+profiles.json
+router-state.json
+filter.json
+logs

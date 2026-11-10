@@ -1,0 +1,95 @@
+{
+  "about": "Kinds of values the filter can mask. Add your own: an id, a name for the dashboard, a TYPE for the placeholder, one or more RE2 patterns (group: mask only that capture group), an optional check (luhn, iban, ssn, ip) and values to leave alone (except).",
+  "entities": [
+    {
+      "id": "email",
+      "name": "Any email",
+      "type": "EMAIL",
+      "patterns": [{"re": "[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}"}],
+      "except": ["@example.com", "@example.org", "noreply"]
+    },
+    {
+      "id": "card",
+      "name": "Any card number",
+      "type": "CARD",
+      "patterns": [{"re": "\\b\\d(?:[ -]?\\d){12,18}\\b"}],
+      "check": "luhn"
+    },
+    {
+      "id": "iban",
+      "name": "Any bank account (IBAN)",
+      "type": "IBAN",
+      "patterns": [{"re": "\\b[A-Z]{2}\\d{2}(?: ?[A-Z0-9]){11,30}\\b"}],
+      "check": "iban"
+    },
+    {
+      "id": "account",
+      "name": "Any account number after \"account\"",
+      "type": "ACCOUNT",
+      "patterns": [{"re": "(?i)(?:\\baccount|\\bacct|\\ba/c|\\brouting|сч[её]т[а-яё]{0,2})(?:\\s*(?:number|no\\.?|num|номер))?\\s*[:#№]?\\s*(\\d[\\d -]{2,22}\\d)", "group": 1}]
+    },
+    {
+      "id": "ssn",
+      "name": "Any SSN",
+      "type": "SSN",
+      "patterns": [{"re": "\\b\\d{3}-\\d{2}-\\d{4}\\b"}],
+      "check": "ssn"
+    },
+    {
+      "id": "phone",
+      "name": "Any phone number",
+      "type": "PHONE",
+      "patterns": [
+        {"re": "(?:\\+\\d{1,3}[ .-]?)?(?:\\(\\d{3}\\)[ .-]?|\\b\\d{3}[ .-])\\d{3}[ .-]\\d{4}\\b"},
+        {"re": "\\+\\d{1,3}(?:[ .-]?\\d{2,4}){3,5}\\b"}
+      ]
+    },
+    {
+      "id": "passport",
+      "name": "Any passport number after \"passport\"",
+      "type": "PASSPORT",
+      "patterns": [{"re": "(?i)(?:passport|паспорт)(?:\\s*(?:number|no\\.?|num|номер|серия))?\\s*[:#№]?\\s*([A-ZА-Я0-9][A-ZА-Я0-9 -]{4,14}\\d)", "group": 1}]
+    },
+    {
+      "id": "dob",
+      "name": "Any date of birth after \"born\"",
+      "type": "DOB",
+      "patterns": [{"re": "(?i)(?:\\bDOB|date of birth|\\bborn(?: on)?|дата рождения|д\\.\\s?р\\.)\\s*[:]?\\s*(\\d{1,4}[./-]\\d{1,2}[./-]\\d{1,4})", "group": 1}]
+    },
+    {
+      "id": "apikey",
+      "name": "Any API key or token",
+      "type": "SECRET",
+      "patterns": [
+        {"re": "\\b(?:sk-ant-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|gsk_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[abposr]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{35}|eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,})"},
+        {"re": "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----"},
+        {"re": "(?i)\\b(?:api[_-]?key|access[_-]?token|auth[_-]?token|token|secret)\\b[\"']?\\s*[:=]\\s*[\"']?([A-Za-z0-9_\\-.]{20,})[\"']?(?:[\\s,;}]|$)", "group": 1},
+        {"re": "(?i)\\bbearer\\s+([A-Za-z0-9_\\-.=]{20,})", "group": 1}
+      ]
+    },
+    {
+      "id": "password",
+      "name": "Any password",
+      "type": "PASSWORD",
+      "patterns": [
+        {"re": "(?i)(?:\\bpassword|\\bpasswd|\\bpwd|\\bpass|пароль)\\s*[:=]\\s*[\"']?([^\\s\"',;]+)", "group": 1},
+        {"re": "\\b[a-zA-Z][a-zA-Z0-9+.-]*://[^\\s:/@]+:([^\\s@/]+)@", "group": 1}
+      ]
+    },
+    {
+      "id": "ip",
+      "name": "Any IP address",
+      "type": "IP",
+      "patterns": [{"re": "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b"}],
+      "check": "ip",
+      "except": ["127.0.0.1", "0.0.0.0", "255.255.255"]
+    },
+    {
+      "id": "url",
+      "name": "Any URL",
+      "type": "URL",
+      "patterns": [{"re": "(?i)\\bhttps?://[^\\s<>\"')\\]]+"}],
+      "except": ["localhost", "127.0.0.1", "example.com", "example.org"]
+    }
+  ]
+}

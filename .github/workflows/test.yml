@@ -1,0 +1,45 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  go:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t wend .
+      - run: |
+          docker run -d --name wend -p 127.0.0.1:8888:8888 wend
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:8888/health && exit 0; sleep 1; done
+          docker logs wend; exit 1
+
+  dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Ubuntu 24.04 blocks the unprivileged user namespaces Chrome's sandbox needs
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: go build -o wend ./cmd/wend
+      - run: node --experimental-websocket tests/ui/pro.mjs ./wend /usr/bin/google-chrome
+      - run: node --experimental-websocket tests/ui/simple.mjs ./wend /usr/bin/google-chrome

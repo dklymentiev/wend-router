@@ -1,0 +1,1804 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wend router</title>
+<link rel="stylesheet" href="/ui/kit.css">
+<style>
+/* The page's own CSS: layout, the dense tables and the charts. Every colour,
+   radius and font comes from the kit's --sn-* tokens above. */
+@layer app {
+  :root[data-theme="dark"] { color-scheme: dark; }
+  body { font-size: 14px; line-height: 1.4; color: var(--sn-ink); }
+  .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* the same width, title and switch as the Simple page, so switching does not move the page */
+  header, main { max-width: var(--sn-content-max-dash); margin-left: auto; margin-right: auto; }
+  header { display: flex; align-items: center; gap: 12px 16px; padding: 32px 24px 20px; flex-wrap: wrap; }
+  header h1 { font: 650 28px/1.2 var(--sn-font); color: var(--sn-ink); letter-spacing: -.01em; }
+  header .mode { width: 170px; }
+  nav.tabs { margin-left: 4px; }
+  .run { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; color: var(--sn-ink-2); }
+  .ok-dot, .off-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--sn-ink-faint); }
+  .ok-dot { background: var(--sn-on); }
+  .rec { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+  main { padding: 0 24px 24px; display: grid; gap: 16px; min-width: 0; }
+  main > section { min-width: 0; }
+  .hscroll { overflow-x: auto; }
+  /* hundreds of models: the table scrolls in its own frame, the header stays in view */
+  .hscroll.tall { max-height: 70vh; overflow-y: auto; }
+  .hscroll.tall thead th { position: sticky; top: 0; z-index: 2; background: var(--sn-surface); }
+  .row2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; }
+  @media (max-width: 1100px) { .row2 { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) { header { padding: 16px 16px 12px; } main { padding: 0 16px 16px; } nav.tabs { margin-left: 0; } }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  /* a tile: what it counts on top, the figure, one line of detail held at the bottom;
+     each part one line, so a tile keeps its height whatever the figures are */
+  .tile { display: flex; flex-direction: column; gap: 4px; min-width: 0; min-height: 124px; }
+  .tile .label, .tile .value, .tile .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .label { color: var(--sn-ink-mute); font-size: 13px; }
+  .tile .value { font: 600 26px/1.2 var(--sn-font); color: var(--sn-ink); letter-spacing: -.01em; }
+  .tile .value.small { font: 600 15px/1.3 var(--sn-font); margin-top: 6px; white-space: normal; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }   /* a model name may take two lines */
+  .tile .value + .sub { margin-top: auto; }
+  .tile .sub { color: var(--sn-ink-mute); font-size: 13px; }
+  .tile .sub:empty { display: none; }
+  /* profiles: a searchable list; a click opens the profile in the side panel */
+  .ptools { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .psearch { flex: 0 1 320px; padding: 0 6px 0 12px; border-radius: var(--sn-r-sm); }
+  /* providers: a grouped list; a row opens its panel */
+  #providers tr.pv-grp td { padding-top: 18px; font: 600 13px var(--sn-font); color: var(--sn-ink-2); border-bottom: 1px solid var(--sn-rule-2); }
+  #providers tr[data-pv] { cursor: pointer; }
+  #providers tr[data-pv]:hover td, #providers tr.is-sel td { background: var(--sn-inset); }
+  #providers td.pvn { font-weight: 600; color: var(--sn-ink); }
+  #providers td:last-child { width: 1%; }
+  #pvedit .pe-actions .summary { flex: 1; min-width: 0; font-size: 13px; color: var(--sn-ink-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #pvedit .pe-actions .state { white-space: nowrap; }
+  #pvedit .pe-actions .sn-switch { font-size: 13px; }
+  #pvedit .sn-drawer__body { overflow-y: auto; }
+  #pvedit .grp { font: 600 15px/1.3 var(--sn-font); color: var(--sn-ink); margin: 18px 0 8px; }
+  .pv-notes { padding: 10px 12px; border-radius: var(--sn-r-sm); background: var(--sn-inset); font-size: 13px; line-height: 1.5; color: var(--sn-ink-2); }
+  .pv-notes p { margin: 0; } .pv-notes p + p { margin-top: 6px; }
+  .pv-url { font-size: 13px; color: var(--sn-ink-2); word-break: break-all; }
+  .pv-key { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--sn-rule-2); }
+  .pv-key .mono { font: 13px var(--sn-mono); color: var(--sn-ink); }
+  .pv-key .why { flex: 1; min-width: 0; }
+  .pv-key.bad .mono { color: var(--sn-danger); }
+  .pv-addrow { display: flex; gap: 8px; margin: 12px 0 8px; }
+  .pv-addrow input { flex: 1; min-width: 0; height: var(--sn-ctl-h); padding: 0 10px; font-size: 14px; color: var(--sn-ink);
+    background: var(--sn-surface); border: 1px solid var(--sn-rule); border-radius: var(--sn-r-sm); outline: none; }
+  .pv-addrow input:focus { border-color: var(--sn-ink-faint); }
+  .pv-addrow #pv-label { flex: 0 0 150px; }
+  #pv-msg { font-size: 13px; }
+  #pvedit .sn-drawer__body .field { margin-bottom: 14px; }
+  #plist tr[data-edit] { cursor: pointer; }
+  #plist tr[data-edit]:hover td, #plist tr.is-sel td { background: var(--sn-inset); }
+  #plist td.pn { font: 600 14px var(--sn-mono); color: var(--sn-ink); width: 1%; }
+  #plist td:nth-child(2) { max-width: 0; width: 60%; color: var(--sn-ink-mute); }
+  /* the profile panel: actions under the title; the settings on top in compact rows;
+     the models they take below, filling the rest */
+  #pedit { width: min(900px, 100vw); }
+  #pedit .pe-actions, #pvedit .pe-actions { display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--sn-rule-2); }
+  #pedit .pe-actions .summary { font-size: 13px; color: var(--sn-ink-2); }
+  #pedit .pe-name { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--sn-ink-mute); }
+  #pedit .pe-name input { width: 220px; height: var(--sn-ctl-h); padding: 0 10px; font: 600 14px var(--sn-mono); color: var(--sn-ink);
+    background: var(--sn-surface); border: 1px solid var(--sn-rule); border-radius: var(--sn-r-sm); outline: none; }
+  #pedit .pe-name input:focus { border-color: var(--sn-ink-faint); }
+  #pedit .pe-actions .pe-msg { flex: 1; min-width: 0; padding: 0; min-height: 0; }
+  #pedit .sn-drawer__body { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; padding-bottom: 0; }
+  #p-fields { flex: 0 0 auto; padding-right: 4px; border-bottom: 1px solid var(--sn-rule-2); }
+  #p-takes { flex: 1 1 0; min-height: 160px; overflow-y: auto; padding: 0 4px 20px 0; }
+  #p-takes .grp:first-child { margin-top: 10px; }
+  /* Good for takes the width its six switches need, in one line; Providers the rest */
+  .hlp { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 6px; padding: 0;
+    border: 1px solid var(--sn-rule); border-radius: 50%; background: none; color: var(--sn-ink-mute); font: 600 11px/1 var(--sn-font);
+    cursor: pointer; vertical-align: 2px; }
+  .hlp:hover { color: var(--sn-ink); border-color: var(--sn-ink-faint); }
+  .hlp-pop { position: fixed; z-index: 100; pointer-events: none; width: 360px; max-width: calc(100vw - 24px); padding: 12px 14px; border-radius: var(--sn-r-sm);
+    background: var(--sn-surface); border: 1px solid var(--sn-rule); box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    font-size: 13px; line-height: 1.5; color: var(--sn-ink-2); }
+  .hlp-pop p { margin: 0; }
+  .hlp-pop p + p { margin-top: 6px; }
+  .pe-head { display: flex; align-items: center; flex: 1; min-width: 0; }
+  .pe-head h3 { flex: none; }
+  #p-takes .thead { display: flex; align-items: center; gap: 16px; margin: 10px 0 6px; }
+  #p-takes .thead .grp { flex: 1; margin: 0; }
+  #p-takes .tsearch { width: 220px; flex: none; }
+  .msel { position: relative; }
+  .msel summary { list-style: none; display: flex; align-items: center; height: var(--sn-ctl-h); padding: 0 26px 0 10px; cursor: pointer;
+    background: var(--sn-surface); border: 1px solid var(--sn-rule); border-radius: var(--sn-r-sm); font-size: 14px; color: var(--sn-ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .msel summary::-webkit-details-marker { display: none; }
+  .msel summary::after { content: ""; position: absolute; right: 11px; top: 50%; width: 6px; height: 6px; margin-top: -5px;
+    border-right: 1.5px solid var(--sn-ink-mute); border-bottom: 1.5px solid var(--sn-ink-mute); transform: rotate(45deg); }
+  .msel__list { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; min-width: 100%; max-height: 260px; overflow-y: auto; padding: 6px;
+    background: var(--sn-surface); border: 1px solid var(--sn-rule); border-radius: var(--sn-r-sm); box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  .msel__list label { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--sn-r-sm); font-size: 14px; cursor: pointer; white-space: nowrap; }
+  .msel__list label:hover { background: var(--sn-inset); }
+  .msel__list input { accent-color: var(--sn-ink); width: 16px; height: 16px; margin: 0; flex: none; }
+  #pedit .pair { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0 40px; }
+  #pedit .pair > .field:first-child .checks { flex-wrap: nowrap; }
+  #pedit .limits { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; }
+  #pedit .limits .inl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--sn-ink-mute); }
+  #pedit .limits select { width: 160px; }
+  #pedit .limits .inl, #pedit .limits .sn-switch { white-space: nowrap; }
+  #pedit .limits .checks { gap: 8px 18px; }
+  @media (max-width: 900px) {
+    #pedit .sn-drawer__body { display: block; overflow-y: auto; }
+    #p-fields, #p-takes { max-height: none; overflow: visible; }
+    #pedit .pair { grid-template-columns: minmax(0, 1fr); }
+  }
+  #pedit .grp { font: 600 15px/1.3 var(--sn-font); color: var(--sn-ink); margin: 14px 0 6px; }
+  #pedit .fields { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px 12px; margin-bottom: 10px; }
+  #pedit .fields .wide { grid-column: span 2; }
+  #pedit .sn-drawer__body .field { margin-bottom: 12px; }
+  #pedit .sn-drawer__body .sn-section:first-child, #pedit .sn-drawer__body > div > .field:first-child { margin-top: 4px; }
+  .pe-msg { padding: 0 20px 6px; font-size: 13px; color: var(--sn-ink-mute); min-height: 18px; }
+  .pe-note { font-size: 13px; color: var(--sn-ink-mute); margin: 0 0 10px; }
+  .danger-text { color: var(--sn-danger) !important; }
+    background-image: linear-gradient(45deg, transparent 50%, var(--sn-ink-mute) 50%), linear-gradient(135deg, var(--sn-ink-mute) 50%, transparent 50%);
+  /* data tables keep every row on one line: a long value is cut and shown whole on hover
+     (the providers table is not one: its cells hold key fields) */
+  .oneline { width: 100%; }
+  .oneline td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* the text columns share what the figures leave and are cut to it (max-width 0 lets an
+     auto-laid table shrink them), so a table fits its card without scrolling sideways */
+  #sessions td:nth-child(4), #sessions td:nth-child(5), #sessions td:nth-child(11),
+  #usage td:nth-child(8), #usage td:nth-child(9),
+  #log td:nth-child(2),
+  #models td:nth-child(10), #models td:nth-child(17), #models td:nth-child(18) { max-width: 0; }
+  #sessions td:nth-child(4), #sessions td:nth-child(5) { width: 22%; }
+  #sessions td:nth-child(11) { width: 18%; }
+  #usage td:nth-child(8), #usage td:nth-child(9) { width: 26%; }
+  #log td:nth-child(2) { width: 40%; }
+  #models td:nth-child(3) { min-width: 220px; max-width: 300px; }
+  #models td:nth-child(5) { min-width: 84px; }   /* the score and its retest button, never cut */
+  .score { display: inline-flex; align-items: center; gap: 6px; }
+  .score .pct { width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+  .score .act { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; }
+  .icon-btn { width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid transparent; border-radius: var(--sn-r-sm); color: var(--sn-ink-mute); cursor: pointer; }
+  .icon-btn:hover { border-color: var(--sn-rule); color: var(--sn-ink); }
+  .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--sn-rule); border-top-color: var(--sn-ink); animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
+  #models td:nth-child(10), #models td:nth-child(17), #models td:nth-child(18) { width: 10%; }
+  /* selecting a model in the table: a ring, filled when chosen */
+  .pick { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--sn-ink-faint); background: none; cursor: pointer; display: block; }
+  .pick:hover { border-color: var(--sn-ink-mute); }
+  .pick.is-on { background: var(--sn-ink); border-color: var(--sn-ink); box-shadow: inset 0 0 0 3px var(--sn-surface); }
+  /* a button whose work is running: a light passes over its label (the kit's sweep) */
+  .is-busy, .is-busy:disabled { opacity: 1; cursor: default; color: transparent; -webkit-background-clip: text; background-clip: text;
+    background-image: linear-gradient(90deg, var(--sn-ink-faint) 0%, var(--sn-ink-faint) 35%, var(--sn-ink) 50%, var(--sn-ink-faint) 65%, var(--sn-ink-faint) 100%);
+    background-size: 250% 100%; animation: sn-think-sweep 1.8s linear infinite; }
+  /* a row being checked or tested: a light passes along it; its cells stay as they are */
+  #models tr.is-running { background: linear-gradient(90deg, transparent 20%, color-mix(in srgb, var(--sn-ink) 9%, transparent) 50%, transparent 80%) no-repeat;
+    background-size: 200% 100%; animation: row-sweep 1.8s linear infinite; }
+  @keyframes row-sweep { from { background-position: 200% 0; } to { background-position: -100% 0; } }
+  @media (prefers-reduced-motion: reduce) { #models tr.is-running { animation: none; background: var(--sn-inset); } }
+  .runbar { display: inline-flex; align-items: center; gap: 8px; }
+  #run-kind { width: 250px; }
+  #run-btn { gap: 6px; min-width: 84px; justify-content: center; }
+  .ico.fill { fill: currentColor; stroke: none; }
+  .runbar #probe-msg { white-space: nowrap; }
+  @media (prefers-reduced-motion: reduce) { .is-busy, .is-busy:disabled { animation: none; background: none; color: var(--sn-ink-mute); } }
+  .selbar { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; color: var(--sn-ink-2); }
+  /* the models a profile takes, in its panel */
+  #p-takes .grp small { font-weight: 400; font-size: 13px; color: var(--sn-ink-mute); margin-left: 6px; }
+  .tlist { border: 1px solid var(--sn-rule-2); border-radius: var(--sn-r-lg); overflow: hidden; }
+  .trow { display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-size: 13px; }
+  .trow + .trow { border-top: 1px solid var(--sn-rule-2); }
+  .tnum { width: 22px; text-align: right; color: var(--sn-ink-mute); }
+  .tname { flex: 1; min-width: 0; font: 13px var(--sn-mono); color: var(--sn-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tstate { flex: 0 0 auto; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tttft { width: 64px; text-align: right; color: var(--sn-ink-mute); }
+  .tleft { margin-top: 10px; border: 1px solid var(--sn-rule-2); border-radius: var(--sn-r-lg); }
+  .tleft + .tlist { margin-top: 8px; }
+  .tleft .sn-row__chev.is-open { transform: rotate(135deg); }
+  .oneline .fails { display: inline; margin-left: 6px; }
+  .oneline td > .speed, .oneline td > .err { display: flex; }
+  .card .showall { margin: 4px -16px -16px; width: calc(100% + 32px); border-top: 1px solid var(--sn-rule-2); }
+  .sn-drawer.wide { width: min(1100px, 100vw); }
+  .sn-drawer.wide table { min-width: 900px; }
+  .veil { position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: calc(var(--sn-z-overlay) - 1); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .veil.is-on { opacity: 1; pointer-events: auto; }   /* an empty warning line must not shift the line above it */
+  .card h2 { display: flex; align-items: center; gap: 8px; font: 600 15px/1.3 var(--sn-font); color: var(--sn-ink); margin-bottom: 12px; }
+  /* every card folds to its heading; the browser remembers which are folded */
+  .fold { margin-left: auto; flex: 0 0 auto; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: var(--sn-r-sm); background: none; cursor: pointer; }
+  .fold:hover { background: var(--sn-inset); }
+  .fold .sn-row__chev { margin: 0; transform: rotate(135deg); transition: transform var(--sn-t-fast); }
+  .card.is-folded .fold .sn-row__chev { transform: rotate(45deg); }
+  .card.is-folded > :not(h2) { display: none !important; }
+  .card.is-folded > h2 { margin-bottom: 0; }
+  .card h2 .hint { color: var(--sn-ink-mute); font-weight: 400; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* charts */
+  .legend { display: flex; gap: 14px; color: var(--sn-ink-mute); font-size: 13px; margin-bottom: 6px; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  #chart, #pipe-chart { position: relative; }
+  /* the range switch keeps its place at the right of the heading; the hint beside it
+     changes length with the range, so it takes the space left and is cut, not the switch moved */
+  .card h2.with-range { display: flex; align-items: center; gap: 8px; }
+  .card h2.with-range .hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #ranges { flex: 0 0 auto; }
+  #ranges button { padding: 0 10px; font-size: 13px; }
+  #tip, #pipe-tip { position: absolute; z-index: 2; display: none; pointer-events: none; white-space: nowrap; padding: 6px 10px; font-size: 13px;
+    background: var(--sn-surface); color: var(--sn-ink-2); border: 1px solid var(--sn-rule); border-radius: var(--sn-r-sm); box-shadow: var(--sn-shadow); }
+  .spark { width: 80px; height: 20px; }
+  .speed { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .speed .sn-bar { width: 70px; }
+
+  /* tables: the kit has none; dense rows on hairlines */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-weight: 500; color: var(--sn-ink-mute); font-size: 13px; padding: 8px; border-bottom: 1px solid var(--sn-rule); white-space: nowrap; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--sn-rule-2); vertical-align: middle; color: var(--sn-ink-2); }
+  td.r, th.r { text-align: right; }
+  tr.dim td { opacity: .42; }
+  th[data-sort] { cursor: pointer; user-select: none; }
+  th[data-sort]:hover { color: var(--sn-ink); }
+  /* the sorted column: a drawn chevron, up or down */
+  th[data-dir]::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 7px; vertical-align: 2px;
+    border-right: 1.5px solid currentColor; border-top: 1.5px solid currentColor; transform: rotate(-45deg); }
+  th[data-dir="down"]::after { transform: rotate(135deg); vertical-align: 4px; }
+  .ico { width: 15px; height: 15px; display: block; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .ico.on { fill: currentColor; }
+  .pin button, button.check { display: inline-grid; place-items: center; }
+  .twist { display: inline-block; width: 7px; height: 7px; margin: 0 9px 1px 1px; transform: rotate(45deg); transition: transform var(--sn-t-fast); }
+  .twist.is-open { transform: rotate(135deg); }
+  .scroll { max-height: 330px; overflow-y: auto; }
+  .scroll th { position: sticky; top: 0; background: var(--sn-surface); }
+  #log td { font-size: 13px; }
+  tr.client { cursor: pointer; }
+  tr.client td { background: var(--sn-inset); color: var(--sn-ink); }
+  tr.sess td:first-child { width: 1px; }
+  .prov-row td { vertical-align: top; }
+  .model { font-weight: 500; color: var(--sn-ink); }
+  .prov, .why, .fails, .err, .empty, .note, #msg { color: var(--sn-ink-mute); }
+  .why { font-size: 13px; white-space: nowrap; }
+  .fails { font-size: 12px; }
+  .err { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .empty { padding: 16px 8px; }
+  .note { font-size: 13px; max-width: 420px; }
+  .tag { display: inline-block; margin-left: 6px; padding: 0 8px; font: 500 11px/1.7 var(--sn-mono); color: var(--sn-ink-mute);
+    background: var(--sn-inset); border: 1px solid var(--sn-rule-2); border-radius: var(--sn-r-pill); }
+
+  /* state marks: the shape tells the state, the status tokens colour it */
+  .state { white-space: nowrap; }
+  .state b { display: inline-block; width: 14px; text-align: center; }
+  .s-good b { color: var(--sn-on); }
+  .s-warning b { color: var(--sn-work); }
+  .s-serious b, .s-critical b { color: var(--sn-danger); }
+  .s-muted b { color: var(--sn-ink-faint); }
+  .okmsg { color: var(--sn-on); }
+  .errmsg { color: var(--sn-danger); }
+
+  /* favourite and reserve pins */
+  .pin { display: inline-flex; gap: 3px; align-items: center; font-size: 13px; color: var(--sn-ink-2); }
+  .pin button { border: 0; background: none; cursor: pointer; padding: 0 3px; line-height: 1; color: var(--sn-ink-faint); }
+  .pin button:hover, .pin button.on { color: var(--sn-ink); }
+  .pin .fav { font-size: 16px; }
+  .pin .rsv { font-size: 14px; }
+  .pin .rsv.on { font-weight: 700; }
+
+  /* profile chips: the chosen one is solid ink */
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .chips button { padding: 5px 12px; font-size: 14px; color: var(--sn-ink-2); background: var(--sn-surface);
+    border: 1px solid var(--sn-rule); border-radius: var(--sn-r-pill); cursor: pointer; }
+  .chips button:hover { border-color: var(--sn-ink-faint); }
+  .chips button.on { background: var(--sn-send); border-color: var(--sn-send); color: var(--sn-on-send); }
+
+  /* form fields */
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px 16px; }
+  #custom-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 16px; align-items: end; }
+  .field label { display: block; color: var(--sn-ink-mute); font-size: 13px; margin-bottom: 4px; }
+  .field select, .field input[type=text], .field input[type=password], .addkey input, #tab-pipe select, #run-kind, #pedit .limits select, #flt-type, #flt-model {
+    width: 100%; height: var(--sn-ctl-h); padding: 0 10px; font-size: 14px; color: var(--sn-ink); background: var(--sn-surface);
+    border: 1px solid var(--sn-rule); border-radius: var(--sn-r-sm); outline: none; }
+  .field select:focus, .field input:focus, .addkey input:focus { border-color: var(--sn-ink-faint); }
+  .field select, #tab-pipe select, #run-kind, #flt-type, #flt-model, #pedit .limits select { appearance: none; -webkit-appearance: none; padding-right: 26px; cursor: pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--sn-ink-mute) 50%), linear-gradient(135deg, var(--sn-ink-mute) 50%, transparent 50%);
+    background-position: calc(100% - 13px) 50%, calc(100% - 8px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+  #tab-pipe select { width: auto; font-size: 13px; }
+  .checks { display: flex; gap: 12px; flex-wrap: wrap; padding-top: 4px; }
+  .checks label, .controls label, #tab-pipe .bar label { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
+  .checks label { color: var(--sn-ink-2); font-size: 14px; }
+  .field .sn-switch { display: inline-flex; margin: 0; color: var(--sn-ink-2); font-size: 14px; }
+  .flt-top { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+  .flt-add { display: flex; gap: 8px; margin-bottom: 12px; }
+  .flt-add input, #flt-pastetext, #flt-trytext { flex: 1; min-width: 0; height: var(--sn-ctl-h); padding: 0 10px; font: 14px var(--sn-font); color: var(--sn-ink);
+    background: var(--sn-surface); border: 1px solid var(--sn-rule); border-radius: var(--sn-r-sm); outline: none; }
+  #flt-pastetext, #flt-trytext { width: 100%; height: auto; padding: 10px 12px; resize: vertical; margin-bottom: 8px; }
+  .flt-add input:focus, #flt-pastetext:focus, #flt-trytext:focus { border-color: var(--sn-ink-faint); }
+  #flt-type { width: 130px; }
+  .flt-ask { display: flex; gap: 8px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--sn-rule-2); }
+  #flt-model { flex: 1; min-width: 0; }
+  .fa-step { margin-top: 14px; }
+  .fa-step .why { font-size: 13px; margin-bottom: 2px; }
+  .fa-step .flt-out { font-size: 13px; max-height: 14em; overflow-y: auto; }
+  .flt-search { flex: 0 1 240px; margin: 0 0 0 auto; }
+  .flt-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--sn-rule-2); }
+  .flt-row.is-kind .flt-t { font-family: var(--sn-font); font-style: italic; }
+  .flt-row.bad .flt-t { color: var(--sn-danger); }
+  .flt-add input:disabled { background: var(--sn-inset); }
+  .flt-row .flt-t { flex: 1; min-width: 0; font: 14px var(--sn-mono); color: var(--sn-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .flt-empty { padding: 12px 0; grid-column: 1 / -1; }
+  #flt-testbtn { margin-left: auto; }
+  #flt-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); column-gap: 32px; align-content: start; }
+  #flttest .flt-add { margin-bottom: 0; }
+  #flttest .flt-add .sn-btn--primary { margin-left: auto; }
+  #flt-tryout { margin-top: 8px; }
+  .flt-out { font: 14px/1.6 var(--sn-mono); color: var(--sn-ink); white-space: pre-wrap; word-break: break-word; }
+  .flt-out .why { font-family: var(--sn-font); margin-bottom: 4px; }
+  .flt-out .ph, .ptext .ph { padding: 0 3px; border-radius: 4px; background: var(--sn-inset); color: var(--sn-ink); font-weight: 600; }
+  #tab-filter .field + .field { margin-top: 12px; }
+  .addkey { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+  .addkey input { width: auto; height: var(--sn-ctl-h-s); padding: 0 8px; font-size: 13px; }
+  .addkey input[type=password] { width: 260px; }
+  .addkey input.label { width: 110px; }
+  .keychip { display: inline-flex; gap: 6px; align-items: center; margin: 0 6px 4px 0; padding: 2px 4px 2px 10px; font: 13px var(--sn-mono);
+    background: var(--sn-inset); border: 1px solid var(--sn-rule); border-radius: var(--sn-r-pill); }
+  .keychip.bad { border-color: var(--sn-danger); }
+  .keychip button { border: 0; background: none; color: var(--sn-ink-mute); cursor: pointer; padding: 0 4px; }
+  .keychip button:hover { color: var(--sn-danger); }
+
+  /* button rows; the small buttons sit inside table rows */
+  .bar { display: flex; gap: 10px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+  .sn-btn:disabled { opacity: .4; cursor: default; transform: none; }
+  .small-btn, button.check, #tab-pipe .bar > button { display: inline-flex; align-items: center; height: var(--sn-ctl-h); padding: 0 12px; font: 500 13px/1 var(--sn-font);
+    color: var(--sn-ink); background: var(--sn-surface); border: 1px solid var(--sn-rule); border-radius: var(--sn-r-sm); cursor: pointer; white-space: nowrap; }
+  .small-btn:hover, button.check:hover, #tab-pipe .bar > button:hover { border-color: var(--sn-ink-faint); }
+  .small-btn.primary { background: var(--sn-send); border-color: var(--sn-send); color: var(--sn-on-send); }
+  /* inside a table row the small height, so rows keep theirs */
+  td .small-btn, td button.check, td .addkey input { height: var(--sn-ctl-h-s); padding: 0 8px; }
+  .small-btn:disabled, button.check:disabled { opacity: .5; cursor: default; }
+  .controls { display: flex; gap: 16px; align-items: center; color: var(--sn-ink-2); font-size: 13px; margin-bottom: 8px; flex-wrap: wrap; }
+  .summary { color: var(--sn-ink-2); }
+  .summary code { font: 13px var(--sn-mono); background: var(--sn-inset); padding: 1px 6px; border-radius: var(--sn-r-xs); }
+
+  /* pipe */
+  #tab-pipe .bar { gap: 12px; margin: 0 0 0 auto; }
+  #tab-pipe .rec { margin-bottom: 0; }
+  #tab-pipe .bar label { font-size: 13px; color: var(--sn-ink-2); }
+  #pipe-totals { font-size: 14px; padding: 2px 2px 0; color: var(--sn-ink-2); }
+  #pipe-tunnel, #pipe-out { height: calc(100vh - 360px); min-height: 260px; overflow: auto; padding: 0; color: var(--sn-ink-2);
+    font: 12.5px/1.45 var(--sn-mono); white-space: pre-wrap; word-break: break-all;
+    background: var(--sn-surface); border: 1px solid var(--sn-rule); border-radius: var(--sn-r-lg); }
+  #pipe-tunnel[hidden], #pipe-out[hidden] { display: none; }
+  .fo { padding: 8px 14px; border-bottom: 1px solid var(--sn-rule-2); white-space: normal; word-break: normal; }
+  .fo-head { display: flex; align-items: center; gap: 10px; font: 13px var(--sn-font); color: var(--sn-ink-2); white-space: nowrap; }
+  .fo-head .pmodel { font: 600 13px var(--sn-mono); color: var(--sn-ink); overflow: hidden; text-overflow: ellipsis; }
+  .fo-text { margin-top: 2px; font: 13px/1.5 var(--sn-mono); color: var(--sn-ink); white-space: pre-wrap; word-break: break-word; max-height: 6em; overflow-y: auto; }
+  .fo-text .ph { padding: 0 3px; border-radius: 4px; background: var(--sn-inset); color: var(--sn-ink); font-weight: 600; }
+  .fo-empty { padding: 12px 14px; font-family: var(--sn-font); }
+  .pcard { padding: 12px 14px; border-bottom: 1px solid var(--sn-rule-2); font: 13px/1.5 var(--sn-font); white-space: normal; word-break: normal; }
+  .pcard:last-child { border-bottom: 0; }
+  .phead { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; white-space: nowrap; }
+  .phead .pmodel { font: 600 13px var(--sn-mono); color: var(--sn-ink); }
+  .phead .ptries { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--sn-ink-2); }
+  .ptry.bad { color: var(--sn-danger); }
+  .pline { display: flex; gap: 12px; line-height: 1.5; }
+  .plab { flex: 0 0 64px; color: var(--sn-ink-mute); }
+  .ptext { flex: 1; min-width: 0; color: var(--sn-ink); white-space: pre-wrap; word-break: break-word; max-height: 9em; overflow-y: auto; }
+  .praw { margin: 8px 0 0; padding: 10px 12px; max-height: 320px; overflow: auto; border-radius: var(--sn-r-sm); background: var(--sn-inset);
+    font: 12px/1.5 var(--sn-mono); color: var(--sn-ink-2); white-space: pre-wrap; word-break: break-all; }
+}
+</style>
+<script>
+// The kit themes by data-theme on <html>; follow the system setting, as the page did before.
+(() => {
+  const dark = matchMedia("(prefers-color-scheme: dark)");
+  const set = () => { document.documentElement.dataset.theme = dark.matches ? "dark" : "light"; };
+  set(); dark.addEventListener("change", set);
+})();
+</script>
+</head>
+<body>
+<header><h1><span class="sn-logo" aria-label="Wend router"><b>WEND</b><small aria-hidden="true"><span>r</span><span>o</span><span>u</span><span>t</span><span>e</span><span>r</span></small></span></h1><nav class="tabs sn-seg"><button data-tab="overview" class="is-on">Overview</button><button data-tab="providers">Providers</button><button data-tab="filter">Filter</button><button data-tab="pipe">Pipe</button></nav><button class="sn-help" id="help-btn" aria-label="Help for this page" title="Help for this page">?</button><span class="run"><span class="off-dot" id="run-dot"></span><span id="conn">connecting</span></span><div class="sn-seg sn-seg--slide mode" style="--n:2;--i:1"><span class="sn-seg__thumb"></span><button id="to-simple" title="the simple view: providers, profiles and how to connect">Simple</button><button class="is-on">Pro</button></div></header>
+<main id="tab-overview">
+  <section class="tiles">
+    <div class="tile sn-card"><div class="label">Requests in flight</div><div class="value num" id="k-inflight">0</div><div class="sub">across all models</div></div>
+    <div class="tile sn-card"><div class="label">Requests per minute</div><div class="value num" id="k-rpm">0</div><div class="sub">model attempts, last 60 s</div></div>
+    <div class="tile sn-card"><div class="label">Tokens per minute</div><div class="value num" id="k-tpm">0</div><div class="sub num" id="k-tpm-sub">in / out, last 60 s</div></div>
+    <div class="tile sn-card"><div class="label">Answered</div><div class="value num" id="k-ok">n/a</div><div class="sub num" id="k-ok-sub">no requests yet</div></div>
+    <div class="tile sn-card"><div class="label">First token</div><div class="value num" id="k-ttft">n/a</div><div class="sub num" id="k-tps">&nbsp;</div></div>
+    <div class="tile sn-card"><div class="label">Spent today</div><div class="value num" id="k-spent">$0</div><div class="sub num" id="k-cap">&nbsp;</div><div class="sub s-warning" id="k-surprise"></div></div>
+    <div class="tile sn-card" id="t-acct" hidden><div class="label" id="k-acct-label">Provider account today</div><div class="value num" id="k-acct">$0</div><div class="sub num" id="k-acct-sub">&nbsp;</div></div>
+    <div class="tile sn-card"><div class="label">Active model (auto)</div><div class="value small" id="k-active">none</div><div class="sub" id="k-models">&nbsp;</div></div>
+  </section>
+
+  <section class="row2">
+    <div class="card sn-card">
+      <h2 class="with-range">Requests<span class="hint" id="chart-hint"></span><span class="sn-seg" id="ranges"><button data-range="10m">10 min</button><button data-range="1h">1 hour</button><button data-range="24h">24 hours</button></span></h2>
+      <div class="legend"><span><i style="background:var(--sn-ink-2)"></i>Served</span><span><i style="background:var(--sn-danger)"></i>Failed</span><span><i style="background:var(--sn-ink-faint)"></i>Checks and tests</span></div>
+      <div id="chart"><svg id="bars" role="img" aria-label="Requests over time"></svg><div id="tip"></div></div>
+    </div>
+    <div class="card sn-card">
+      <h2>Live requests<span class="hint">newest first</span></h2>
+      <div class="scroll"><table id="log" class="oneline"><thead><tr><th>Time</th><th>Model</th><th>Result</th><th class="r">First token</th><th class="r">Total</th><th class="r">Tok/s</th><th class="r">Cost</th><th class="r">Tries</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="card sn-card" id="sessions-card">
+    <h2>Clients and sessions<span class="hint">last 15 minutes</span></h2>
+    <div class="hscroll"><table id="sessions" class="oneline"><thead><tr>
+      <th>Client</th><th>Profile</th><th>Session</th><th>Now on</th><th>Models that answered</th><th class="r">Requests</th><th class="r" title="input / output tokens; estimated where the provider did not report usage">Tokens in / out</th><th class="r">In flight</th><th class="r" title="requests that needed more than one model">Fallbacks</th><th>Last</th><th>Latest switch</th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+  <section class="card sn-card" id="usage-card">
+    <h2>Usage by day<span class="hint">kept across restarts</span></h2>
+    <div class="hscroll"><table id="usage" class="oneline"><thead><tr>
+      <th>Day</th><th class="r">Requests</th><th class="r">Answered</th><th class="r" title="attempts on a model that failed; the request may still have been answered by another">Failed attempts</th>
+      <th class="r">Tokens in</th><th class="r">Tokens out</th><th class="r" title="share of the tokens the router estimated">Estimated</th><th>Top providers by tokens in</th><th>Clients</th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="card sn-card" id="profiles-card">
+    <h2>Profiles<span class="hint">what your agent asks for</span></h2>
+    <div class="ptools"><div class="sn-field psearch"><input id="p-search" placeholder="Search profiles" autocomplete="off"></div><button class="small-btn" id="p-new">+ New profile</button></div>
+    <div class="hscroll"><table id="plist" class="oneline"><thead><tr>
+      <th>Profile</th><th>Rules</th><th class="r">Models</th><th class="r">Answering now</th><th>Last used</th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="card sn-card">
+    <h2>Models<span class="hint" id="m-hint"></span></h2>
+    <div class="controls">
+      <label class="sn-switch"><input type="checkbox" role="switch" id="used"> Only models that have served or failed</label>
+      <span class="runbar"><select id="run-kind" aria-label="What to run">
+          <option value="check">Quick check: one short call a model</option>
+          <option value="test">Full test: 8 calls a model</option>
+        </select><button class="small-btn" id="run-btn"></button><span id="probe-msg" class="why"></span></span>
+      <span class="selbar" id="selbar" hidden><b id="sel-n"></b> selected <button class="small-btn primary" id="sel-new">New profile from selected</button><button class="small-btn" id="sel-clear">Clear</button></span>
+    </div>
+    <div class="hscroll tall"><table id="models" class="oneline"><thead><tr>
+      <th title="select models to make a profile of them"></th><th data-sort="state">State</th><th data-sort="model">Model</th><th class="r" data-sort="tier" title="measured by the tests when tested, else from the seed">Tier</th><th class="r" data-sort="score" title="share of text tests passed; hover for each test">Score</th><th class="r" data-sort="ttft">First token</th><th>Recent first tokens</th>
+      <th class="r" data-sort="tps">Tok/s</th><th class="r" data-sort="cost" title="1K tokens in, 1K out">Cost / request</th><th title="from name and description, capabilities and measured speed">Good for</th><th class="r" data-sort="inflight">In flight</th><th class="r" data-sort="rpm">Req/min</th><th class="r" data-sort="avail" title="recent attempts">Avail</th><th data-sort="usually" title="how it usually behaves; older outcomes fade over days">Usually</th><th class="r" data-sort="ok">OK / Err</th><th data-sort="touch">Last touched</th><th title="what the provider says is left in its rate-limit windows">Quota left</th><th>Last error</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+</main>
+<main id="tab-providers" hidden>
+  <section class="card sn-card">
+    <h2>Providers<span class="hint">where the models come from</span></h2>
+    <div class="ptools"><div class="sn-field psearch"><input id="pv-search" placeholder="Search providers" autocomplete="off"></div><button class="small-btn primary" id="pv-new">+ Add provider</button></div>
+    <div class="hscroll"><table id="providers" class="oneline"><thead><tr>
+      <th>Provider</th><th>State</th><th>Usually</th><th class="r">Models</th><th>Keys</th><th>Prompts</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+</main>
+<main id="tab-filter" hidden>
+  <section class="card sn-card">
+    <h2>Filter<span class="hint">names kept from the models</span></h2>
+    <div class="flt-top"><label class="sn-switch"><input type="checkbox" role="switch" id="flt-on"> Mask these terms in requests</label><span id="flt-msg" class="why"></span>
+      <button class="small-btn" id="flt-testbtn">Test the filter</button></div>
+    <div class="flt-add"><input type="text" id="flt-term" placeholder="A name, a host, a person..." autocomplete="off">
+      <select id="flt-type"></select><button class="small-btn primary" id="flt-addbtn">Add</button><button class="small-btn" id="flt-pastebtn">Paste a list</button>
+      <div class="sn-field psearch flt-search"><input id="flt-search" placeholder="Search terms" autocomplete="off"></div></div>
+    <div id="flt-paste" hidden><textarea id="flt-pastetext" rows="6" spellcheck="false" placeholder="One per line: a term, or a term, a comma or a tab, and its type&#10;Acme Corp, ORG&#10;db.example.lan, HOST"></textarea>
+      <div class="flt-add"><button class="small-btn primary" id="flt-pasteadd">Add these</button><button class="small-btn" id="flt-pastecancel">Cancel</button></div></div>
+    <div id="flt-list"></div>
+  </section>
+</main>
+<main id="tab-pipe" hidden>
+  <section class="card sn-card">
+    <h2>Pipe<span class="hint">every request as it passes</span></h2>
+    <div class="rec"><label id="traffic-box" class="sn-switch" title="write every request and response, as they were, to a JSON Lines file per day; prompts and answers end up on disk"><input type="checkbox" role="switch" id="traffic"> Record traffic to disk</label><span id="traffic-dir" class="why">off: prompts and answers are not written anywhere</span><div class="bar"><span class="run"><span class="off-dot" id="pipe-dot"></span><span id="pipe-state">Not connected</span></span>
+      <span class="sn-seg" id="pipe-view"><button data-view="cards" class="is-on">Requests</button><button data-view="out">Outgoing</button></span>
+      <button id="pipe-pause">Pause</button><button id="pipe-clear">Clear</button>
+      <label>keep the last <select id="pipe-window"><option>20</option><option selected>50</option><option>200</option></select> requests</label></div></div>
+  </section>
+  <section class="card sn-card" id="pipe-chart">
+    <div class="legend"><span><i style="background:var(--sn-ink-2)"></i>sent to models (up)</span><span><i style="background:var(--sn-ink-faint)"></i>received from models (down)</span><span class="why">bytes per second, last 2 minutes</span></div>
+    <svg id="pipe-bars"></svg><div id="pipe-tip"></div>
+  </section>
+  <div id="pipe-totals" class="num"></div>
+  <div id="pipe-tunnel"></div>
+  <div id="pipe-out" hidden><div class="why fo-empty">Nothing has gone out since the router started.</div></div>
+</main>
+<div class="veil" id="veil"></div>
+<aside class="sn-drawer" id="flttest" aria-label="Test the filter">
+  <div class="sn-drawer__head"><h3>Test the filter</h3><button class="sn-drawer__x" id="flt-testx" aria-label="Close">&times;</button></div>
+  <div class="sn-drawer__body">
+    <textarea id="flt-trytext" rows="10" spellcheck="false" placeholder="Paste any text: a letter, a log, a prompt"></textarea>
+    <div class="flt-add"><button class="sn-btn sn-btn--ghost" id="flt-tryclip">Paste</button><button class="sn-btn sn-btn--ghost" id="flt-tryclear">Clear</button><button class="sn-btn sn-btn--primary" id="flt-trybtn">Test</button></div>
+    <div id="flt-tryout" class="why">Paste text and press Test: what the model would get shows here, the masked parts highlighted.</div>
+    <div class="flt-ask"><select id="flt-model" aria-label="Model"></select><button class="sn-btn sn-btn--ghost" id="flt-askbtn">Ask the model</button></div>
+    <div id="flt-askout"></div>
+  </div>
+</aside>
+<aside class="sn-drawer" id="pvedit" aria-label="Provider">
+  <div class="sn-drawer__head"><h3 id="pv-title">Provider</h3><button class="sn-drawer__x" id="pv-close" aria-label="Close">&times;</button></div>
+  <div class="pe-actions" id="pv-actions"></div>
+  <div class="sn-drawer__body" id="pv-body"></div>
+</aside>
+<aside class="sn-drawer" id="pedit" aria-label="Profile">
+  <div class="sn-drawer__head"><div class="pe-head"><h3 id="pe-title">Profile</h3><button class="hlp" data-help="about" aria-label="How profiles work">?</button></div><button class="sn-drawer__x" id="pe-close" aria-label="Close">&times;</button></div>
+  <div class="pe-actions"><label class="pe-name">Name <input type="text" id="f-pname" autocomplete="off"></label><span class="summary" id="p-summary"></span><span class="pe-msg" id="msg"></span><button class="sn-btn sn-btn--ghost danger-text" id="p-delete">Delete</button><button class="sn-btn sn-btn--ghost" id="p-revert">Revert</button><button class="sn-btn sn-btn--primary" id="p-save">Save</button></div>
+  <div class="sn-drawer__body"><div id="p-fields"></div><div id="p-takes"></div></div>
+</aside>
+<aside class="sn-drawer wide" id="tdrawer" aria-label="The whole table">
+  <div class="sn-drawer__head"><h3 id="t-title">All</h3><button class="sn-drawer__x" id="t-close" aria-label="Close">&times;</button></div>
+  <div class="sn-drawer__body"><div class="hscroll" id="t-body"></div></div>
+</aside>
+<script>
+// Pro remembers itself; the Simple link makes Simple the page /dashboard opens.
+try { localStorage.setItem("router-mode", "pro"); } catch {}
+document.getElementById("to-simple").addEventListener("click", () => { try { localStorage.setItem("router-mode", "simple"); } catch {} location.href = "/dashboard"; });
+const STATES = {
+  ok: ["s-good", "●", "Up"], quota: ["s-warning", "▲", "Quota"], open: ["s-serious", "◆", "Cooling down"],
+  gone: ["s-critical", "✕", "Unavailable"], "provider-off": ["s-critical", "✕", "Provider off"],
+  failing: ["s-serious", "◆", "Last check failed"], untested: ["s-muted", "○", "Untested"],
+};
+const OUTCOMES = {
+  tested: ["s-good", "✓", "Tested"], ok: ["s-good", "●", "Served"], failed: ["s-critical", "✕", "Failed"], "client-error": ["s-serious", "◆", "Bad request"],
+  "client-left": ["s-muted", "○", "Client left"], "broke-midway": ["s-critical", "✕", "Broke midway"],
+};
+let models = [], log = [], status = {}, dirty = true;
+let meta = { names: [], profiles: {}, builtin: [], providers: [] }, sel = "auto", draft = {}, preview = [], previewTimer = 0;
+const $ = (id) => document.getElementById(id);
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+// A long table shows its first rows, never cutting a group (a client and its sessions);
+// a row under it says how many more and opens the whole table in the side panel, so the
+// card keeps its height. groupStart says where a group begins; by default every row.
+let tshowing = null;
+function clampTable(id, maxRows, noun, groupStart = () => true) {
+  const t = $(id), wrap = t.closest(".hscroll"), rows = [...t.tBodies[0].rows], rest = [];
+  titleCells(t);
+  let hide = false, shown = 0;
+  for (const r of rows) {
+    if (groupStart(r)) { if (shown >= maxRows) hide = true; if (hide) rest.push(r.cells[0].textContent.replace(/^[▸▾]\s*/u, "").trim()); }
+    r.hidden = hide; if (!hide) shown++;
+  }
+  let b = wrap.nextElementSibling;
+  if (!b || !b.classList.contains("showall")) {
+    b = document.createElement("button"); b.className = "sn-row showall"; wrap.after(b);
+    b.onclick = () => { tshowing = id; fillTable(id, b.dataset.title); $("tdrawer").classList.add("is-open"); $("veil").classList.add("is-on"); };
+  }
+  b.hidden = !rest.length;
+  b.dataset.title = t.closest(".card").querySelector("h2").firstChild.textContent;
+  b.innerHTML = `<span class="sn-row__main"><span class="sn-row__title">${plural(rest.length, "more " + noun)}</span><span class="sn-row__sub">${esc(rest.slice(0, 3).join(", "))}${rest.length > 3 ? " and others" : ""}</span></span><span class="sn-row__chev"></span>`;
+  if (tshowing === id) fillTable(id, b.dataset.title);
+}
+function fillTable(id, title) {
+  const c = $(id).cloneNode(true); c.removeAttribute("id");
+  [...c.tBodies[0].rows].forEach((r) => r.hidden = false);
+  $("t-title").textContent = title; $("t-body").replaceChildren(c);
+}
+function closeTable() { tshowing = null; $("tdrawer").classList.remove("is-open"); $("veil").classList.remove("is-on"); }
+document.addEventListener("click", (e) => { if (e.target.id === "t-close" || e.target.id === "veil") closeTable(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeTable(); });
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ms = (v) => v ? (v >= 10000 ? (v / 1000).toFixed(0) + " s" : v >= 1000 ? (v / 1000).toFixed(1) + " s" : Math.round(v) + " ms") : "";
+const usd = (v) => v >= 0.01 ? "$" + v.toFixed(2) : v > 0 ? "$" + v.toFixed(5) : "";
+const ago = (t) => {
+  const s = Math.max(0, (Date.now() - new Date(t)) / 1000);
+  return s < 60 ? `${Math.round(s)} s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago`;
+};
+const usuallyLabel = (u, s) => {
+  const [cls, icon] = u === "stable" ? ["s-good", "\u25CF"] : u === "mostly ok" ? ["s-warning", "\u25B2"] : u === "flaky" ? ["s-critical", "\u2715"] : ["s-muted", "\u25CB"];
+  return `<span class="state ${cls}" title="${u === "new" ? "too few attempts to say" : Math.round((s || 0) * 100) + "% good, recent weighs more"}"><b>${icon}</b>${esc(u)}</span>`;
+};
+// Small line icons, in the text colour: the page draws no text arrows or glyph icons.
+const ICON = {
+  star: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6l2.5 5.2 5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8z"/></svg>',
+  starOn: '<svg class="ico on" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6l2.5 5.2 5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8z"/></svg>',
+  last: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14"/></svg>',
+  play: '<svg class="ico fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
+  stopFill: '<svg class="ico fill" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg>',
+  stop: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg>',
+  again: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4.5H15"/></svg>',
+};
+function pinCell(key) {
+  const first = (draft.pinned || []).indexOf(key), last = (draft.fallback || []).indexOf(key);
+  const v = first >= 0 ? "first" : last >= 0 ? "last" : "";
+  const n = first >= 0 ? first + 1 : last >= 0 ? last + 1 : "";
+  // A second press on the lit button clears it.
+  const star = `<button class="fav${v === "first" ? " on" : ""}" data-pinset="${esc(key)}|${v === "first" ? "" : "first"}" title="${v === "first" ? `favourite no. ${n}: tried first; press to clear` : "make it a favourite: tried before the others"}">${v === "first" ? ICON.starOn : ICON.star}</button>`;
+  const back = `<button class="rsv${v === "last" ? " on" : ""}" data-pinset="${esc(key)}|${v === "last" ? "" : "last"}" title="${v === "last" ? `reserve no. ${n}: tried last; press to clear` : "make it a reserve: tried after everything else, even outside the filters"}">${ICON.last}</button>`;
+  return `<span class="pin">${star}${back}${n ? `<span class="num">${n}</span>` : ""}</span>`;
+}
+// The score and its test button sit in two fixed slots: the number never moves or goes
+// away; while the model is being tested the button gives way to a turning ring.
+function scoreCell(m) {
+  const busy = runNow()?.kind === "test" && runNow().now?.includes(m.key);
+  const pct = m.test ? Math.round(m.test.score * 100) + "%" : "—";
+  const tip = m.test ? `tested ${ago(m.test.at)}\n` + Object.entries(m.test.passed).map(([k, v]) => `${v ? "✓" : "✗"} ${k}${m.test.notes?.[k] ? ": " + m.test.notes[k] : ""}`).join("\n") : "not tested yet";
+  const act = busy ? `<button class="icon-btn" data-stop-model="${esc(m.key)}" title="stop this test" aria-label="stop this test">${ICON.stop}</button>`
+    : `<button class="icon-btn" data-test="${esc(m.key)}" title="${m.test ? "test again" : "run the 8 tests now"}" aria-label="test">${ICON.again}</button>`;
+  return `<span class="score"><span class="pct" title="${esc(tip)}">${pct}</span><span class="act">${act}</span></span>`;
+}
+function quotaLeft(l) {
+  if (!l) return "";
+  const k = (n) => (n >= 10000 ? Math.round(n / 1000) + "K" : n >= 1000 ? (n / 1000).toFixed(1) + "K" : String(n));
+  const names = { tokens: "tok", requests: "req", "requests-day": "req/day", minute: "req/min", window: "req" };
+  return Object.entries(l).map(([n, w]) => `<span title="resets at ${esc(new Date(w.reset).toLocaleTimeString([], { hour12: false }))}">${k(w.left)} ${names[n] || n}</span>`).join(", ");
+}
+const kTok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e4 ? Math.round(n / 1e3) + "K" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n || 0));
+const clock = (t) => new Date(t).toLocaleTimeString([], { hour12: false });
+const median = (a) => { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+const label = (map, key) => { const [cls, icon, text] = map[key] || ["s-muted", "○", key]; return `<span class="state ${cls}"><b>${icon}</b>${esc(text)}</span>`; };
+
+// ---- live data
+function connect() {
+  const es = new EventSource("/events");
+  es.onerror = () => { $("conn").textContent = "reconnecting"; $("run-dot").className = "off-dot"; };
+  es.addEventListener("history", (e) => { log = JSON.parse(e.data); dirty = true; });
+  es.addEventListener("request", (e) => {
+    const r = JSON.parse(e.data);
+    log.push(r); if (log.length > 500) log.shift(); dirty = true;
+    const key = r.model || (r.failures?.[0] || "").replace(/ \(.*$/, "");
+  });
+  es.addEventListener("status", (e) => { status = JSON.parse(e.data); models = status.models || []; dirty = true; });
+}
+
+// ---- profile editor
+const TRI = [["", "Any"], ["require", "Required"], ["exclude", "Excluded"]];
+const COSTS = [["free", "Free only"], ["default", "Default"], ["0.0001", "up to $0.0001"], ["0.0005", "up to $0.0005"],
+  ["0.001", "up to $0.001"], ["0.005", "up to $0.005"], ["0.01", "up to $0.01"], ["0.05", "up to $0.05"]];
+const HEDGE = [["0", "Never"], ["3000", "after 3 s"], ["5000", "after 5 s"], ["8000", "after 8 s"], ["15000", "after 15 s"]];
+const TTFT = [["0", "Any"], ["500", "under 0.5 s"], ["1000", "under 1 s"], ["2000", "under 2 s"], ["5000", "under 5 s"]];
+const TPS = [["0", "Any"], ["25", "25+"], ["50", "50+"], ["100", "100+"], ["200", "200+"]];
+const CTX = [["0", "Any"], ["32000", "32K+"], ["128000", "128K+"], ["256000", "256K+"], ["1000000", "1M+"]];
+const TIER = [["0", "Any"], ["1", "Tier 1 only"], ["2", "Tier 2 or better"], ["3", "Tier 3 or better"]];
+const SORT = [["strongest", "Strongest first"], ["fastest", "Fastest first"], ["cheapest", "Cheapest first"], ["available", "Most available first"]];
+const opts = (list, v) => list.map(([k, t]) => `<option value="${k}"${String(v) === k ? " selected" : ""}>${esc(t)}</option>`).join("");
+
+async function loadProfiles(keepSel) {
+  meta = await (await fetch("/api/profiles")).json();
+  COSTS[1][1] = meta.default_max_cost > 0 ? `Default (up to $${meta.default_max_cost})` : "Default (free only)";
+  if (!keepSel || !meta.profiles[sel]) sel = meta.profiles.auto ? "auto" : (meta.names || [])[0] || "";
+  draft = structuredClone(meta.profiles[sel] || {});
+  if ($("pedit").classList.contains("is-open")) renderEditor();
+  renderPList(); requestPreview(); loadPreviews();
+}
+
+// "Good for: vision" means the same as Vision required, so the editor shows only the
+// Vision list; a profile saved with the vision domain opens with Vision required.
+// The ? beside a heading opens a few lines on that section, one per setting.
+const HELP = {
+  about: ["A profile is a name your agent sends as the model, for example auto or fast.",
+    "The router takes every model the settings let in, tries them in order and moves to the next when one fails.",
+    "The list at the bottom follows the settings as you change them. Save, then put the name in your tool's model field."],
+  which: ["Tool calling, Vision, Thinking: Required takes only models known to have it, Excluded drops them, Any ignores it.",
+    "Providers: only models from the ticked providers; All takes every provider.",
+    "Name contains: only models whose name has one of these words.",
+    "Good for: only models good at every ticked area, judged by their name, their tests and their measured speed."],
+  picks: ["Order: which model the router tries first.",
+    "Strength: skip models below this tier.",
+    "First token, Speed: skip models measured slower than this.",
+    "Context window: skip models that take less text than this.",
+    "Ask the next after: when the model has not started answering by then, the next one is asked too and the first answer wins."],
+  limits: ["Price: the most one request may cost; Default follows the router's own setting.",
+    "No training on prompts: skip providers whose free tier may train on what you send.",
+    "Only pinned models: use only the models starred in the list below."],
+  takes: ["Every model the settings let in, in the order the router tries them.",
+    "The star sends a model to the top, the arrow to the end as a reserve. Grey rows are left out by the settings."],
+};
+const help = (k) => `<button class="hlp" data-help="${k}" aria-label="What this is">?</button>`;
+document.body.insertAdjacentHTML("beforeend", `<div class="hlp-pop" id="hlp-pop" role="tooltip" hidden></div>`);
+let helpFor = null;
+function closeHelp() { $("hlp-pop").hidden = true; helpFor = null; }
+function showHelp(b) {
+  const k = b.dataset.help, pop = $("hlp-pop");
+  pop.innerHTML = HELP[k].map((x) => `<p>${esc(x)}</p>`).join("");
+  pop.hidden = false; helpFor = k;
+  // under the button, kept inside the window
+  const r = b.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = Math.max(12, Math.min(r.left - 12, innerWidth - w - 12)) + "px";
+  pop.style.top = (r.bottom + 8 + h > innerHeight - 12 ? r.top - 8 - h : r.bottom + 8) + "px";
+}
+// shown while the pointer is on the ?; a tap (no hover on touch screens) toggles it
+document.addEventListener("mouseover", (e) => { const b = e.target.closest("button.hlp"); if (b) showHelp(b); });
+document.addEventListener("mouseout", (e) => { if (e.target.closest("button.hlp")) closeHelp(); });
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button.hlp");
+  if (!b) return closeHelp();
+  if (helpFor === b.dataset.help && !matchMedia("(hover: hover)").matches) closeHelp(); else showHelp(b);
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && helpFor) closeHelp(); });
+document.addEventListener("scroll", closeHelp, true);
+function capState(c) {
+  if ((draft.require || []).includes(c) || (c === "vision" && (draft.domains || []).includes("vision"))) return "require";
+  if ((draft.exclude || []).includes(c)) return "exclude";
+  return "";
+}
+function costState() {
+  if (draft.free_only) return "free";
+  if (draft.max_cost === undefined || draft.max_cost === null) return "default";
+  return String(draft.max_cost);
+}
+
+const provsText = (list) => !list?.length ? "All" : list.join(", ");
+function renderEditor() {
+  $("f-pname").value = sel;
+  const provs = meta.providers.map((p) => `<label><input type="checkbox" data-prov="${esc(p)}"${(draft.providers || []).includes(p) ? " checked" : ""}>${esc(p)}</label>`).join("");
+  const fams = draft.families && Object.keys(draft.families).length
+    ? `<p class="pe-note">Models picked in Simple: ${esc(describeProfile(draft))}. They stay; change them in Simple.</p>` : "";
+  $("p-fields").innerHTML = `
+    <h3 class="grp">Which models ${help("which")}</h3>${fams}
+    <div class="fields">
+      <div class="field"><label>Tool calling</label><select data-cap="tools">${opts(TRI, capState("tools"))}</select></div>
+      <div class="field"><label>Vision (images)</label><select data-cap="vision">${opts(TRI, capState("vision"))}</select></div>
+      <div class="field"><label>Thinking (reasoning)</label><select data-cap="reasoning">${opts(TRI, capState("reasoning"))}</select></div>
+      <div class="field"><label>Providers</label><details class="msel"><summary id="f-provs">${esc(provsText(draft.providers))}</summary><div class="msel__list">${provs}</div></details></div>
+      <div class="field wide"><label>Name contains</label><input type="text" id="f-names" placeholder="coder, gpt-oss (comma separated)" value="${esc((draft.models || []).map((g) => g.replace(/^\*|\*$/g, "")).join(", "))}"></div>
+    </div>
+    <div class="field"><label title="from the model's name and description, what it can do, and its measured speed">Good for (all ticked)</label><div class="checks">${(meta.domains || []).filter((d) => d !== "vision").map((d) => `<label class="sn-switch"><input type="checkbox" role="switch" data-domain="${esc(d)}"${(draft.domains || []).includes(d) ? " checked" : ""}>${esc(d)}</label>`).join("")}</div></div>
+    <h3 class="grp">How it picks ${help("picks")}</h3>
+    <div class="fields">
+      <div class="field"><label>Order</label><select id="f-sort">${opts(SORT, draft.sort || "strongest")}</select></div>
+      <div class="field"><label>Strength</label><select data-num="max_tier">${opts(TIER, draft.max_tier || 0)}</select></div>
+      <div class="field"><label>First token</label><select data-num="max_ttft_ms">${opts(TTFT, draft.max_ttft_ms || 0)}</select></div>
+      <div class="field"><label>Speed, tokens/s</label><select data-num="min_tps">${opts(TPS, draft.min_tps || 0)}</select></div>
+      <div class="field"><label>Context window</label><select data-num="min_context">${opts(CTX, draft.min_context || 0)}</select></div>
+      <div class="field"><label title="when the model has not started answering by then, the same request also goes to the next model and the first to answer wins; faster, at up to twice the quota">Ask the next after</label><select data-num="hedge_after_ms">${opts(HEDGE, draft.hedge_after_ms || 0)}</select></div>
+    </div>
+    <h3 class="grp">Limits ${help("limits")}</h3>
+    <div class="limits">
+      <label class="inl" title="the most one request may cost">Price <select id="f-cost">${opts(COSTS, costState())}</select></label>
+    <div class="checks">
+      <label class="sn-switch" title="skip providers whose free tier may train on prompts"><input type="checkbox" role="switch" id="f-private"${draft.no_training ? " checked" : ""}>No training on prompts</label>
+      <label class="sn-switch" title="use nothing but the models pinned with a star below"><input type="checkbox" role="switch" id="f-onlypin"${draft.only_pinned ? " checked" : ""}>Only pinned models</label>
+    </div></div>`;
+  updateSummary();
+}
+
+function readEditor() {
+  const d = {}, req = [], exc = [];
+  document.querySelectorAll("[data-cap]").forEach((s) => { if (s.value === "require") req.push(s.dataset.cap); if (s.value === "exclude") exc.push(s.dataset.cap); });
+  if (req.length) d.require = req;
+  if (exc.length) d.exclude = exc;
+  const cost = $("f-cost").value;
+  if (cost === "free") d.free_only = true; else if (cost !== "default") d.max_cost = Number(cost);
+  document.querySelectorAll("[data-num]").forEach((s) => { const v = Number(s.value); if (v) d[s.dataset.num] = v; });
+  const sort = $("f-sort").value; if (sort !== "strongest") d.sort = sort;
+  const names = $("f-names").value.split(",").map((s) => s.trim()).filter(Boolean).map((s) => `*${s}*`);
+  if (names.length) d.models = names;
+  const doms = [...document.querySelectorAll("[data-domain]:checked")].map((c) => c.dataset.domain);
+  if (doms.length) d.domains = doms;
+  const provs = [...document.querySelectorAll("[data-prov]:checked")].map((c) => c.dataset.prov);
+  if (provs.length) d.providers = provs;
+  if ($("f-private").checked) d.no_training = true;
+  if ($("f-onlypin").checked) d.only_pinned = true;
+  if (draft.pinned?.length) d.pinned = draft.pinned;
+  if (draft.fallback?.length) d.fallback = draft.fallback;
+  if (draft.families && Object.keys(draft.families).length) d.families = draft.families;   // set in Simple; kept here
+  return d;
+}
+
+function requestPreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(async () => {
+    const r = await fetch("/api/preview", { method: "POST", body: JSON.stringify(draft) });
+    if (r.ok) { preview = (await r.json()).models || []; updateSummary(); renderTakes(); dirty = true; }
+    else { $("msg").textContent = (await r.json()).error?.message || "preview failed"; }
+  }, 150);
+}
+
+function updateSummary() {
+  const hits = preview.filter((p) => p.match);
+  const paid = hits.filter((p) => p.cost > 0).map((p) => p.cost);
+  const saved = meta.profiles[sel];
+  const changed = !saved || JSON.stringify(draft) !== JSON.stringify(saved);
+  const renamed = $("f-pname") && $("f-pname").value.trim() !== sel;
+  $("p-save").disabled = !changed && !renamed; $("p-revert").disabled = !changed || !saved;
+  $("p-summary").innerHTML = `${hits.length} of ${preview.length} models match` + (paid.length ? `, paid from ${usd(Math.min(...paid))}` : hits.length ? ", all free" : "");
+
+}
+
+// ---- the list of profiles: rules in one phrase, how many models, answering now, last used
+let PREV = {}, ASKED = {};
+const SORTW = { strongest: "Strongest first", fastest: "Fastest first", cheapest: "Cheapest first", available: "Most available first" };
+function describeProfile(p) {
+  if (p.families && Object.keys(p.families).length)
+    return Object.entries(p.families).map(([id, at]) => at?.length ? `${id} at ${at.join(", ")}` : `${id} at any provider`).join("; ");
+  const bits = [SORTW[p.sort || "strongest"]];
+  (p.require || []).forEach((c) => bits.push(c === "tools" ? "calls tools" : c === "vision" ? "sees images" : "thinks"));
+  if ((p.exclude || []).includes("reasoning")) bits.push("no thinking");
+  if (p.no_training) bits.push("private providers only");
+  if (p.providers?.length) bits.push("at " + p.providers.join(", "));
+  if (p.models?.length) bits.push("names like " + p.models.join(", "));
+  if (p.only_pinned) bits.push(`pinned only (${(p.pinned || []).length})`);
+  else if (p.pinned?.length) bits.push(`${p.pinned.length} pinned first`);
+  if (p.hedge_after_ms) bits.push(`asks the next after ${p.hedge_after_ms / 1000} s`);
+  if (p.free_only) bits.push("free only");
+  return bits.join(", ");
+}
+const lastUsed = (n) => {
+  const t = ASKED[n]; if (!t) return '<span class="why">not used yet</span>';
+  const d = Math.floor((Date.now() - new Date(t)) / 86400e3);
+  return d < 1 ? "today" : d < 2 ? "yesterday" : `${d} days ago`;
+};
+function renderPList() {
+  const q = $("p-search").value.trim().toLowerCase();
+  const names = (meta.names || []).filter((n) => !q || n.includes(q) || describeProfile(meta.profiles[n] || {}).toLowerCase().includes(q));
+  const open = $("pedit").classList.contains("is-open");
+  $("plist").tBodies[0].innerHTML = names.map((n) => {
+    const p = meta.profiles[n] || {}, c = PREV[n];
+    return `<tr class="prow${open && n === sel ? " is-sel" : ""}" data-edit="${esc(n)}"><td class="pn">${esc(n)}</td><td>${esc(describeProfile(p))}</td>` +
+      `<td class="r num">${c ? c.all : ""}</td><td class="r num">${c ? (c.now < c.all ? `<span class="s-warning">${c.now}</span>` : c.now) : ""}</td><td class="num">${lastUsed(n)}</td></tr>`;
+  }).join("") || `<tr><td colspan="5" class="empty">No profile matches "${esc(q)}"</td></tr>`;
+  titleCells($("plist"));
+  clampTable("plist", q ? 1000 : 8, "profile");
+}
+async function loadPreviews() {
+  await Promise.all((meta.names || []).map(async (n) => {
+    try {
+      const list = (await (await fetch("/api/preview", { method: "POST", body: JSON.stringify(meta.profiles[n] || {}) })).json()).models || [];
+      const taken = list.filter((e) => e.match || (e.reason || "").startsWith("down now"));
+      PREV[n] = { all: taken.length, now: taken.filter((e) => e.match).length };
+    } catch {}
+  }));
+  renderPList();
+}
+function selectProfile(name) { sel = name; draft = structuredClone(meta.profiles[sel] || {}); requestPreview(); dirty = true; }
+// preset: a draft to start from (a new profile made of the models selected in the table)
+function openEdit(name, preset) {
+  takesQuery = "";   // each profile opens with the whole list
+  selectProfile(name); if (preset) { draft = preset; requestPreview(); } $("msg").textContent = ""; showLeft = false;
+  $("pe-title").textContent = name ? `Profile ${name}` : "New profile";
+  $("p-delete").hidden = !meta.profiles[name];
+  $("pedit").classList.add("is-open"); $("veil").classList.add("is-on");
+  renderEditor(); renderPList(); renderTakes();
+}
+function closeEdit() { $("pedit").classList.remove("is-open"); if (!tshowing) $("veil").classList.remove("is-on"); updateSummary(); renderPList(); }
+$("p-search").oninput = renderPList;
+// an open list closes on a click anywhere else
+document.addEventListener("click", (e) => { for (const d of document.querySelectorAll("details.msel[open]")) if (!d.contains(e.target)) d.open = false; });
+$("f-pname").oninput = updateSummary;
+// The models the profile takes, live as its settings change, in the order it tries them;
+// a star tries one first, an arrow keeps one for last. Those it leaves out fold under them.
+let showLeft = false;
+// The search only narrows what the list shows; the profile is not changed by it.
+let takesQuery = "";
+function renderTakes() {
+  if (!$("pedit").classList.contains("is-open")) return;
+  const box = $("t-search"), focused = box && document.activeElement === box, caret = box?.selectionStart;
+  const q = takesQuery.trim().toLowerCase(), shown = (e) => !q || e.key.toLowerCase().includes(q);
+  const byKey = Object.fromEntries(models.map((m) => [m.key, m]));
+  const takes = (e) => e.match || (e.reason || "").startsWith("down now");
+  const take = preview.filter(takes), left = preview.filter((e) => !takes(e));
+  const row = (e, i) => {
+    const m = byKey[e.key] || {};
+    return `<div class="trow">${pinCell(e.key)}<span class="tnum num">${i === null ? "" : i + 1}</span><span class="tname" title="${esc(e.key)}">${esc(e.key)}</span>` +
+      `<span class="tstate">${e.match ? label(STATES, stOf(m)) : `<span class="why">${esc(e.reason || "")}</span>`}</span><span class="tttft num">${ms(m.ttft_ms)}</span></div>`;
+  };
+  const rows = take.map((e, i) => shown(e) ? row(e, i) : "").join("");
+  $("p-takes").innerHTML = `<div class="thead"><h3 class="grp">Models it takes ${help("takes")} <small>${take.length} of ${preview.length}, in the order it tries them</small></h3>` +
+    `<label class="sn-field tsearch"><input type="search" id="t-search" placeholder="Find a model" value="${esc(takesQuery)}" autocomplete="off"></label></div>` +
+    `<div class="sn-group tlist">${rows || `<div class="sn-empty">${take.length ? "No model here has that in its name." : "None. Loosen the settings above."}</div>`}</div>` +
+    (left.length ? `<button class="sn-row tleft" id="tleft"><span class="sn-row__main"><span class="sn-row__title">${plural(left.length, "model")} left out</span><span class="sn-row__sub">${showLeft ? "why each is left out" : esc(left.slice(0, 3).map((e) => e.key.slice(e.key.indexOf("/") + 1)).join(", ")) + (left.length > 3 ? " and others" : "")}</span></span><span class="sn-row__chev${showLeft ? " is-open" : ""}"></span></button>` +
+      (showLeft ? `<div class="sn-group tlist">${left.filter(shown).map((e) => row(e, null)).join("")}</div>` : "") : "");
+  if (focused) { $("t-search").focus(); $("t-search").setSelectionRange(caret, caret); }   // live redraws keep the typing
+}
+$("p-takes").addEventListener("input", (e) => { if (e.target.id === "t-search") { takesQuery = e.target.value; renderTakes(); } });
+$("p-takes").addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  const s = e.target.closest("[data-pinset]");
+  if (s) { const [key, value] = s.dataset.pinset.split("|"); setPin(key, value); return; }
+  if (e.target.closest("#tleft")) { showLeft = !showLeft; renderTakes(); }
+});
+$("sel-new").onclick = () => { openEdit("", { pinned: [...picked], only_pinned: true }); $("f-pname").focus(); };
+$("sel-clear").onclick = () => { picked.clear(); dirty = true; };
+$("p-new").onclick = () => { sel = ""; draft = {}; openEdit(""); $("f-pname").focus(); };
+document.addEventListener("click", (e) => {
+  const r = e.target.closest("tr[data-edit]"); if (r) { closeTable(); openEdit(r.dataset.edit); return; }
+  if (e.target.id === "pe-close" || (e.target.id === "veil" && $("pedit").classList.contains("is-open"))) closeEdit();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("pedit").classList.contains("is-open")) closeEdit(); });
+$("p-fields").addEventListener("change", (e) => { if (e.target.id === "f-pname") return updateSummary(); draft = readEditor();
+  if (e.target.dataset.prov) $("f-provs").textContent = provsText(draft.providers); updateSummary(); requestPreview(); });
+$("p-fields").addEventListener("input", (e) => {
+  if (e.target.id === "f-pname") return updateSummary();
+  if (e.target.id === "f-names") { draft = readEditor(); updateSummary(); requestPreview(); }
+});
+async function saveProfile() {
+  const name = ($("pedit").classList.contains("is-open") ? $("f-pname").value : sel).trim();
+  if (!/^[a-z0-9][a-z0-9._-]{0,40}$/.test(name)) { $("msg").textContent = "A name is lowercase letters, digits, dot, dash."; return; }
+  const r = await api(`/api/profiles/${encodeURIComponent(name)}`, { method: "PUT", body: JSON.stringify(draft) });
+  if (!r.ok) { $("msg").textContent = r.err || "save failed"; return; }
+  if (sel && sel !== name && meta.profiles[sel]) await api(`/api/profiles/${encodeURIComponent(sel)}`, { method: "DELETE" });   // renamed
+  sel = name; $("msg").textContent = `Saved ${name}`;
+  await loadProfiles(true);
+  if ($("pedit").classList.contains("is-open")) { $("pe-title").textContent = `Profile ${name}`; $("p-delete").hidden = false; }
+}
+$("p-save").onclick = saveProfile;
+const revertProfile = () => { draft = structuredClone(meta.profiles[sel] || {}); if ($("pedit").classList.contains("is-open")) renderEditor(); requestPreview(); updateSummary(); dirty = true; };
+$("p-revert").onclick = revertProfile;
+$("p-delete").onclick = async () => {
+  if (!meta.profiles[sel]) return;
+  if (!confirm(`Delete profile "${sel}"? A tool that still sends it is served by the default order.`)) return;
+  const r = await api(`/api/profiles/${encodeURIComponent(sel)}`, { method: "DELETE" });
+  if (!r.ok) { $("msg").textContent = r.err || "delete failed"; return; }
+  closeEdit(); await loadProfiles(false);
+};
+
+// ---- rendering
+function renderTiles() {
+  const now = Date.now(), recent = log.filter((r) => !r.probe && now - r.t < 5 * 60e3 && r.outcome !== "client-left");
+  const ok = recent.filter((r) => r.outcome === "ok");
+  $("k-inflight").textContent = status.inflight ?? 0;
+  $("k-rpm").textContent = status.rpm ?? 0;
+  const tm = status.tokens_minute || { in: 0, out: 0 };
+  $("k-tpm").textContent = kTok(tm.in + tm.out);
+  $("k-tpm-sub").textContent = `${kTok(tm.in)} in / ${kTok(tm.out)} out, last 60 s`;
+  if (recent.length) { $("k-ok").textContent = Math.round(100 * ok.length / recent.length) + "%"; $("k-ok-sub").textContent = `${ok.length} of ${recent.length}, last 5 min`; }
+  else { $("k-ok").textContent = "n/a"; $("k-ok-sub").textContent = "no requests in 5 min"; }
+  const tt = ok.map((r) => r.ttft_ms).filter(Boolean), tps = ok.map((r) => r.tps).filter(Boolean);
+  $("k-ttft").textContent = tt.length ? ms(median(tt)) : "n/a";
+  $("k-tps").textContent = "median, last 5 min" + (tps.length ? `, ${median(tps).toFixed(0)} tok/s` : "");
+  $("k-spent").textContent = usd(status.spent || 0) || "$0";
+  $("k-cap").textContent = `budget $${status.budget ?? 0}/day, week ${usd(status.spent_week || 0) || "$0"}`;
+  $("k-cap").title = `all time ${usd(status.spent_all || 0) || "$0"}`;
+  $("k-surprise").innerHTML = status.surprise > 0 ? `<b>▲</b> ${usd(status.surprise)} charged by models taken as free` : "";
+  const acct = (status.accounts || [])[0];
+  $("t-acct").hidden = !acct;
+  if (acct) {
+    $("k-acct-label").textContent = `${acct.provider} key today, all its users`;
+    $("k-acct").textContent = usd(acct.today) || "$0";
+    $("k-acct-sub").textContent = `week ${usd(acct.week) || "$0"}` + (acct.limit_remaining != null ? `, $${acct.limit_remaining.toFixed(2)} left of $${acct.limit} ${acct.limit_reset || ""} limit` : "");
+  }
+  // the model's own name, its provider under it; the full key in the tooltip
+  const act = status.active || "", slash = act.indexOf("/");
+  $("k-active").textContent = act ? act.slice(slash + 1).replace(/^.*\//, "") : "none";
+  $("k-active").title = act;
+  $("k-models").textContent = act ? act.slice(0, slash) : "";
+  const up = models.filter((m) => m.state === "ok").length;
+  $("conn").textContent = `Running, ${up} model${up === 1 ? "" : "s"} up`;
+  $("run-dot").className = up ? "ok-dot" : "off-dot";
+}
+
+// Drawn at the container's real size, so text never stretches; redrawn on resize.
+const RANGES = { "10m": { span: 10 * 60e3, n: 60, label: "10 seconds" }, "1h": { span: 60 * 60e3, n: 60, label: "minute" }, "24h": { span: 24 * 3600e3, n: 96, label: "15 minutes" } };
+let chartRange = localStorage.getItem("chart-range") || "10m";
+function renderChart() {
+  const svg = $("bars"), box = $("chart"), R = RANGES[chartRange] || RANGES["10m"];
+  const W = Math.max(300, Math.round(box.clientWidth)), H = 240, top = 10, bottom = 22, left = 34, right = 6, n = R.n, step = R.span / n;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("width", W); svg.setAttribute("height", H);
+  const now = Date.now(), start = now - n * step;
+  const buckets = Array.from({ length: n }, (_, i) => ({ t: start + i * step, ok: 0, bad: 0, chk: 0 }));
+  for (const r of log) {
+    if (r.t < start || r.outcome === "client-left") continue;
+    const b = buckets[Math.min(n - 1, Math.floor((r.t - start) / step))];
+    if (r.probe) b.chk++; else if (r.outcome === "ok") b.ok++; else b.bad++;
+  }
+  const peak = Math.max(1, ...buckets.map((b) => b.ok + b.bad + b.chk));
+  const nice = peak <= 4 ? 4 : peak <= 10 ? 10 : Math.ceil(peak / 10) * 10;
+  const plotW = W - left - right, plotH = H - top - bottom, colW = plotW / n, barW = Math.max(1, colW - 2);
+  const y = (v) => top + plotH - (v / nice) * plotH;
+  let out = "";
+  for (const v of [0, nice / 2, nice]) {
+    out += `<line x1="${left}" x2="${W - right}" y1="${y(v)}" y2="${y(v)}" stroke="var(${v === 0 ? "--sn-rule" : "--sn-rule-2"})" stroke-width="1"/>`;
+    out += `<text x="${left - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--sn-ink-mute)">${v}</text>`;
+  }
+  const ago = { "10m": ["-10 min", "-5 min"], "1h": ["-60 min", "-30 min"], "24h": ["-24 h", "-12 h"] }[chartRange] || ["", ""];
+  out += `<text x="${left}" y="${H - 6}" font-size="11" fill="var(--sn-ink-mute)">${ago[0]}</text>`;
+  out += `<text x="${left + plotW / 2}" y="${H - 6}" font-size="11" fill="var(--sn-ink-mute)" text-anchor="middle">${ago[1]}</text>`;
+  out += `<text x="${W - right}" y="${H - 6}" font-size="11" fill="var(--sn-ink-mute)" text-anchor="end">now</text>`;
+  buckets.forEach((b, i) => {
+    const x = left + i * colW + 1;
+    let base = y(0);
+    for (const [v, color] of [[b.ok, "var(--sn-ink-2)"], [b.bad, "var(--sn-danger)"], [b.chk, "var(--sn-ink-faint)"]]) {
+      if (!v) continue;
+      const h = y(0) - y(v);
+      out += `<rect x="${x}" y="${base - h}" width="${barW}" height="${Math.max(1, h - 1)}" rx="1.5" fill="${color}"/>`;
+      base -= h;
+    }
+    out += `<rect x="${left + i * colW}" y="${top}" width="${colW}" height="${plotH}" fill="transparent" data-i="${i}"/>`;
+  });
+  svg.innerHTML = out;
+  svg.onmousemove = (e) => {
+    const i = e.target.dataset?.i, tip = $("tip");
+    if (i === undefined) { tip.style.display = "none"; return; }
+    const b = buckets[i];
+    tip.innerHTML = `<div>${clock(b.t)}, ${R.label}</div><div class="num">Served ${b.ok}</div><div class="num">Failed ${b.bad}</div><div class="num">Checks ${b.chk}</div>`;
+    const bx = box.getBoundingClientRect();
+    tip.style.display = "block";
+    tip.style.left = Math.min(e.clientX - bx.left + 12, bx.width - 130) + "px";
+    tip.style.top = (e.clientY - bx.top - 10) + "px";
+  };
+  svg.onmouseleave = () => { $("tip").style.display = "none"; };
+}
+
+function sparkline(key) {
+  const pts = log.filter((r) => r.model === key && r.outcome === "ok" && r.ttft_ms).slice(-20).map((r) => r.ttft_ms);
+  if (pts.length < 2) return "";
+  const max = Math.max(...pts), w = 80, h = 20;
+  const xy = pts.map((v, i) => `${(i / (pts.length - 1)) * (w - 2) + 1},${h - 2 - (v / max) * (h - 4)}`).join(" ");
+  const last = xy.split(" ").pop().split(",");
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}"><title>first token, last ${pts.length} requests: ${pts.map(ms).join(", ")}</title>` +
+    `<polyline points="${xy}" fill="none" stroke="var(--sn-ink-mute)" stroke-width="1.5" stroke-linejoin="round"/><circle cx="${last[0]}" cy="${last[1]}" r="2.5" fill="var(--sn-ink)"/></svg>`;
+}
+
+// The Models table watches every model; it is not tied to a profile (a profile's
+// models are in its side panel). Selected rows can become a new profile.
+const picked = new Set();
+const stOf = (m) => m.state === "ok" && m.health === "failing" ? "failing" : m.state === "ok" && m.health === "untested" ? "untested" : m.state;
+const costOf = (m) => ((m.price_in_m || 0) + (m.price_out_m || 0)) / 1000;   // 1K tokens in and 1K out, priced per 1M
+function renderModels() {
+  const onlyUsed = $("used").checked;
+  const maxTps = Math.max(1, ...models.map((m) => m.tps || 0));
+  let items = models.filter((m) => !onlyUsed || m.ok || m.errors).map((m) => ({ m, st: stOf(m), cost: costOf(m) }));
+  const sm = sorts.models;
+  items = sm ? sortBy(items, MODEL_SORT[sm.key], sm.dir) : sortBy(sortBy(items, (r) => r.m.tier, 1), (r) => STATE_RANK[r.st] ?? 9, 1);
+  const rows = items.map(({ m, st, cost }) => {
+    const slash = m.key.indexOf("/");
+    const until = m.until ? ` title="until ${esc(clock(m.until))}"` : "";
+    const avail = m.availability < 0 ? "" : Math.round(m.availability * 100) + "%";
+    const speed = m.tps ? `<div class="speed"><span class="num">${m.tps.toFixed(0)}</span><div class="sn-bar"><i style="width:${(m.tps / maxTps) * 100}%"></i></div></div>` : "";
+    const price = m.price_in_m || m.price_out_m ? `title="$${(m.price_in_m || 0).toFixed(2)} in / $${(m.price_out_m || 0).toFixed(2)} out per 1M tokens"` : "";
+    const now = !!runNow()?.now?.includes(m.key);   // being checked or tested right now
+    return `<tr${now ? ' class="is-running"' : ""}><td><button class="pick${picked.has(m.key) ? " is-on" : ""}" data-pick="${esc(m.key)}" aria-label="select ${esc(m.key)}"></button></td><td${until}>${label(STATES, st)}</td>` +
+      `<td><span class="prov">${esc(m.key.slice(0, slash + 1))}</span><span class="model">${esc(m.key.slice(slash + 1))}</span>` +
+      `${m.key === status.active ? '<span class="tag">auto</span>' : ""}${m.trains_on_free ? ' <span class="prov" title="free tier may train on prompts">*</span>' : ""}</td>` +
+      `<td class="r num" title="${m.test ? `measured; seed said ${m.seed_tier}` : "from the seed, not tested yet"}">${m.tier}${m.test ? "" : '<span class="why">?</span>'}</td><td class="r num">${scoreCell(m)}</td><td class="r num">${ms(m.ttft_ms)}</td><td>${sparkline(m.key)}</td><td class="r">${speed}</td>` +
+      `<td class="r num" ${price}>${cost > 0 ? usd(cost) : "free"}</td><td class="why">${esc((m.domains || []).join(", "))}</td>` +
+      `<td class="r num">${m.inflight || ""}</td><td class="r num">${m.rpm || ""}</td><td class="r num">${avail}</td><td>${usuallyLabel(m.usually, m.usually_share)}</td>` +
+      `<td class="r num">${m.ok || m.errors ? `${m.ok} / ${m.errors}` : ""}</td>` +
+      `<td class="num" title="${m.last_touch ? esc(new Date(m.last_touch).toLocaleString()) : ""}">${m.last_touch ? `${m.health === "failing" ? "failed" : "ok"}, ${ago(m.last_touch)}` : '<span class="why">never</span>'}</td>` +
+      `<td class="num why">${quotaLeft(m.limits)}${m.max_request ? `${m.limits ? ", " : ""}<span title="the account accepts no single request above this (a per-minute token cap)">max ${m.max_request >= 1000 ? Math.round(m.max_request / 1000) + "K" : m.max_request} tok/request</span>` : ""}</td>` +
+      `<td><div class="err" title="${esc(m.last_error)}">${esc(m.last_error)}</div></td>` +
+      `<td>${cost > 0 ? "" : runNow()?.kind === "check" && runNow().now?.includes(m.key) ? `<button class="check" data-stop-model="${esc(m.key)}" title="stop this check">Stop</button>` : `<button class="check" data-probe="${esc(m.key)}" title="send a short test request now">Check</button>`}</td></tr>`;
+  });
+  setBody($("models"), rows.join("") || `<tr><td colspan="19" class="empty">No models yet</td></tr>`);
+  $("m-hint").textContent = "* may train on prompts";
+  $("sel-n").textContent = plural(picked.size, "model"); $("selbar").hidden = !picked.size;
+}
+
+function renderLog() {
+  const rows = log.slice(-40).reverse().map((r) => {
+    const fails = r.failures?.length ? `<div class="fails">skipped: ${esc(r.failures.join(", "))}</div>` : "";
+    return `<tr><td class="num">${clock(r.t)}</td><td>${esc(r.model || "")}${r.probe ? ' <span class="tag">probe</span>' : ""}${fails}</td><td>${label(OUTCOMES, r.outcome)}</td>` +
+      `<td class="r num">${ms(r.ttft_ms)}</td><td class="r num">${ms(r.total_ms)}</td><td class="r num">${r.tps ? r.tps.toFixed(0) : ""}</td><td class="r num" title="${r.cost_from === "estimate" ? "estimated from tokens and list price" : r.cost_from === "provider" ? "as reported by the provider" : ""}">${r.cost_from === "free" ? '<span class="why">free</span>' : (r.cost_from === "estimate" ? "≈" : "") + usd(r.cost)}</td><td class="r num">${r.attempts}</td></tr>`;
+  });
+  setBody($("log"), rows.join("") || `<tr><td colspan="8" class="empty">Waiting for requests</td></tr>`);
+}
+
+function setBody(table, html) {
+  if (table._html !== html) { table.tBodies[0].innerHTML = html; table._html = html; titleCells(table); }
+}
+// a cell cut to one line shows its whole text on hover
+function titleCells(table) { for (const td of table.querySelectorAll("td")) if (!td.title) td.title = td.textContent.trim(); }
+
+
+// Sessions grouped by client: one line per client with totals, its
+// conversations under it when opened (open by default when there are few).
+const openClients = {};
+function sessionRow(s) {
+  const used = Object.entries(s.models || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(k)} <span class="why">\u00d7${n}</span>`).join(", ");
+  const sw = s.switches || [];
+  const last = sw.length ? sw[sw.length - 1] : "";
+  return `<tr class="sess"><td></td><td>${esc(s.profile)}</td>` +
+    `<td class="num" title="${s.explicit ? "named by the client (X-Session-Id)" : "recognised from the conversation"}">${esc(s.id.slice(0, 15))}${s.explicit ? "" : ' <span class="why">auto</span>'}</td>` +
+    `<td>${s.current ? `<b>${esc(s.current)}</b>` : '<span class="why">none yet</span>'}</td><td>${used}</td>` +
+    `<td class="r num">${s.requests}</td><td class="r num">${kTok(s.tokens_in)} / ${kTok(s.tokens_out)}</td><td class="r num">${s.inflight || ""}</td><td class="r num">${s.fallbacks || ""}${s.failed ? ` <span class="s-critical" title="no model could serve">(${s.failed} failed)</span>` : ""}</td>` +
+    `<td class="num">${ago(s.last)}</td><td class="why" title="${esc(sw.join("\n"))}">${esc(truncateText(last, 90))}</td></tr>`;
+}
+// ---- usage by day
+const tkShort = (n) => n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n);
+async function loadUsage() {
+  try {
+    const r = await fetch("/api/usage?days=14");
+    if (!r.ok) return;
+    const j = await r.json(), days = j.days || [];
+    ASKED = j.asked || {}; renderPList();
+    const top = (m, k) => Object.entries(m || {}).sort((a, b) => b[1][k] - a[1][k]).slice(0, 3)
+      .map(([name, c]) => `${esc(name)} <span class="why">${tkShort(c[k])}</span>`).join(", ");
+    $("usage").querySelector("tbody").innerHTML = days.map((d) => {
+      const t = d.total, all = t.tokens_in + t.tokens_out, est = t.estimated_in + t.estimated_out;
+      return `<tr><td>${esc(d.date)}</td><td class="r num">${t.requests}</td><td class="r num">${t.ok}</td><td class="r num">${t.failed}</td>` +
+        `<td class="r num">${tkShort(t.tokens_in)}</td><td class="r num">${tkShort(t.tokens_out)}</td><td class="r num">${all ? Math.round(est * 100 / all) + "%" : ""}</td>` +
+        `<td>${top(d.by_provider, "tokens_in")}</td><td>${top(d.by_client, "requests")}</td></tr>`;
+    }).join("") || `<tr><td colspan="9" class="why">nothing yet</td></tr>`;
+    clampTable("usage", 7, "day");
+  } catch { /* the next refresh tries again */ }
+}
+loadUsage();
+setInterval(loadUsage, 60000);
+
+function renderSessions() {
+  const list = status.sessions || [];
+  const groups = {};
+  for (const s of list) (groups[s.client] ||= []).push(s);
+  const rows = [];
+  for (const [client, ss] of Object.entries(groups).sort((a, b) => Date.parse(b[1][0].last) - Date.parse(a[1][0].last))) {
+    const open = openClients[client] ?? ss.length <= 3;
+    const models = {}, profiles = {};
+    let req = 0, inflight = 0, fb = 0, failed = 0, tin = 0, tout = 0;
+    for (const s of ss) {
+      req += s.requests; inflight += s.inflight || 0; tin += s.tokens_in || 0; tout += s.tokens_out || 0; fb += s.fallbacks || 0; failed += s.failed || 0;
+      profiles[s.profile] = (profiles[s.profile] || 0) + 1;
+      for (const [k, n] of Object.entries(s.models || {})) models[k] = (models[k] || 0) + n;
+    }
+    const used = Object.entries(models).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(k)} <span class="why">\u00d7${n}</span>`).join(", ");
+    rows.push(`<tr class="client" data-client="${esc(client)}"><td><b><span class="sn-row__chev twist${open ? " is-open" : ""}"></span>${esc(client)}</b></td>` +
+      `<td>${Object.keys(profiles).map(esc).join(", ")}</td><td class="why">${ss.length} conversation${ss.length === 1 ? "" : "s"}</td>` +
+      `<td><b>${esc(ss[0].current || "")}</b></td><td>${used}</td><td class="r num">${req}</td><td class="r num">${kTok(tin)} / ${kTok(tout)}</td><td class="r num">${inflight || ""}</td>` +
+      `<td class="r num">${fb || ""}${failed ? ` <span class="s-critical">(${failed} failed)</span>` : ""}</td><td class="num">${ago(ss[0].last)}</td><td></td></tr>`);
+    if (open) for (const s of ss) rows.push(sessionRow(s));
+  }
+  setBody($("sessions"), rows.join("") || `<tr><td colspan="11" class="empty">No active sessions yet. They appear here as soon as an agent sends a request.</td></tr>`);
+  clampTable("sessions", 8, "client", (r) => !r.classList.contains("sess"));
+}
+$("sessions").addEventListener("pointerdown", (e) => {
+  const tr = e.target.closest("tr.client"); if (!tr || e.button !== 0) return;
+  const c = tr.dataset.client, list = (status.sessions || []).filter((s) => s.client === c);
+  openClients[c] = !(openClients[c] ?? list.length <= 3);
+  dirty = true;
+});
+function truncateText(s, n) { return s.length > n ? s.slice(0, n) + "…" : s; }
+
+function frame() {
+  if (dirty) { dirty = false; renderTiles(); renderSessions(); renderChart(); renderModels(); renderLog(); renderRun(); }
+  requestAnimationFrame(frame);
+}
+$("used").onchange = () => { dirty = true; };
+function setRange(r) {
+  chartRange = r; localStorage.setItem("chart-range", r);
+  document.querySelectorAll("#ranges button").forEach((b) => b.classList.toggle("is-on", b.dataset.range === r));
+  $("chart-hint").textContent = `per ${RANGES[r].label}, last ${{ "10m": "10 minutes", "1h": "hour", "24h": "24 hours" }[r]}; the last 500 requests are kept`;
+  dirty = true;
+}
+$("ranges").addEventListener("click", (e) => { const b = e.target.closest("[data-range]"); if (b) setRange(b.dataset.range); });
+setRange(chartRange);
+window.addEventListener("resize", () => { dirty = true; });
+// A check or a test, of all free models or of one, is the router's own run
+// (status.test_run): models done, calls done, the models being asked now. One list says
+// what to run, one button starts it and, while it runs, stops it; the message beside it
+// counts, then says how it ended. A row's own button stops that model alone.
+let shownEnd = 0;
+const runNow = () => status?.test_run?.running ? status.test_run : null;
+const runNames = { check: ["Checking", "Checked"], test: ["Testing", "Tested"] };
+function renderRun() {
+  const run = runNow(), last = status?.test_run;
+  const want = run ? "stop" : "start";
+  if ($("run-btn").dataset.state !== want) {   // redraw only on a change, so a press is never lost
+    $("run-btn").dataset.state = want;
+    $("run-btn").innerHTML = run ? `${ICON.stopFill}Stop` : `${ICON.play}Start`;
+  }
+  $("run-kind").disabled = !!run;
+  if (run) {
+    $("run-kind").value = run.kind;
+    const pct = Math.floor(run.calls_done / Math.max(1, run.calls) * 100);
+    $("probe-msg").className = "sn-think__label";
+    $("probe-msg").textContent = run.total === 1 ? `${runNames[run.kind][0]} ${run.now?.[0] || ""}, ${pct}%`
+      : `${runNames[run.kind][0]} ${run.done} of ${run.total} models, ${pct}%`;
+    return;
+  }
+  $("probe-msg").className = "why";
+  if (last && last.started !== shownEnd) {   // once, how the last run ended
+    shownEnd = last.started;
+    $("probe-msg").textContent = last.stopped ? `Stopped: ${last.done} of ${last.total} done` : `${runNames[last.kind][1]} ${last.total === 1 ? "1 model" : last.total + " models"}`;
+  } else if (!last && $("probe-msg").className === "why" && /^(Checking|Testing)/.test($("probe-msg").textContent)) {
+    $("probe-msg").textContent = "";
+  }
+}
+async function startRun(kind, key) {
+  const r = await api(`/api/${kind === "test" ? "test" : "probe"}` + (key ? "?model=" + encodeURIComponent(key) : ""), { method: "POST" });
+  $("probe-msg").className = "why";
+  $("probe-msg").textContent = r.ok ? "" : (r.err || "failed");
+}
+const stopRun = (key) => api("/api/test/stop" + (key ? "?model=" + encodeURIComponent(key) : ""), { method: "POST" });
+$("run-btn").onclick = () => runNow() ? stopRun("") : startRun($("run-kind").value, "");
+setInterval(renderRun, 1000);
+// pointerdown, not click: the table redraws while live data arrives
+// Buttons act on pointerdown: the table redraws while live data arrives.
+function setPin(key, value) {
+  const pins = (draft.pinned || []).filter((k) => k !== key), backs = (draft.fallback || []).filter((k) => k !== key);
+  if (value === "first") pins.push(key);
+  if (value === "last") backs.push(key);
+  draft = { ...draft, pinned: pins, fallback: backs };
+  if (!pins.length) { delete draft.pinned; delete draft.only_pinned; }
+  if (!backs.length) delete draft.fallback;
+  updateSummary(); requestPreview(); dirty = true;
+}
+$("models").addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  const k = e.target.closest("[data-pick]");
+  if (k) { const key = k.dataset.pick; picked.has(key) ? picked.delete(key) : picked.add(key); dirty = true; return; }
+  const st = e.target.closest("[data-stop-model]");
+  if (st) return stopRun(st.dataset.stopModel);
+  const b = e.target.closest("[data-probe]");
+  if (b) startRun("check", b.dataset.probe);
+  const t = e.target.closest("[data-test]");
+  if (t) startRun("test", t.dataset.test);
+});
+setInterval(() => { dirty = true; }, 5000);  // the chart's time axis moves even when idle
+setInterval(requestPreview, 10000);         // speeds and states change what matches
+
+// ---- pipe: the raw traffic, live, as one stream; connected only while the tab is open
+const PIPE_COLORS = ["#2a78d6", "#c0532f", "#2f8f5b", "#8a4fc4", "#b8860b", "#1f8a8a"];
+const pipe = { seen: 0, at: 0, es: null, paused: false, held: [], buf: new Map(), color: new Map(), n: 0, queue: [], scheduled: false, bytes: new Map() };
+// Bytes per second over the last two minutes: sent up, received down,
+// one scale for both (the same unit), so their sizes compare honestly.
+const PIPE_SECONDS = 120;
+const pipeSec = new Map(); // unix second -> { s, r }
+function pipeCount(field, n) {
+  const sec = Math.floor(pipe.at / 1000);
+  const b = pipeSec.get(sec) || { s: 0, r: 0 };
+  b[field] += n; pipeSec.set(sec, b);
+}
+function renderPipeChart() {
+  if ($("tab-pipe").hidden) return;
+  const svg = $("pipe-bars"), box = $("pipe-chart");
+  const W = Math.max(300, Math.round(box.clientWidth - 32)), H = 120, top = 6, bottom = 16, left = 54, right = 4, mid = top + (H - top - bottom) / 2;
+  const now = Math.floor(Date.now() / 1000), start = now - PIPE_SECONDS + 1;
+  for (const k of pipeSec.keys()) if (k < start) pipeSec.delete(k);
+  const cols = Array.from({ length: PIPE_SECONDS }, (_, i) => ({ t: start + i, ...(pipeSec.get(start + i) || { s: 0, r: 0 }) }));
+  const peak = Math.max(1024, ...cols.map((c) => Math.max(c.s, c.r)));
+  const half = mid - top, colW = (W - left - right) / PIPE_SECONDS, barW = Math.max(1, colW - 2);
+  const h = (v) => (v / peak) * half;
+  let out = `<line x1="${left}" x2="${W - right}" y1="${mid}" y2="${mid}" stroke="var(--sn-rule)" stroke-width="1"/>`;
+  for (const [y, label] of [[top, kb(peak)], [mid, "0"], [mid + half, kb(peak)]]) {
+    if (y !== mid) out += `<line x1="${left}" x2="${W - right}" y1="${y}" y2="${y}" stroke="var(--sn-rule-2)" stroke-width="1"/>`;
+    out += `<text x="${left - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--sn-ink-mute)">${label}</text>`;
+  }
+  out += `<text x="${left}" y="${H - 3}" font-size="11" fill="var(--sn-ink-mute)">-2 min</text>`;
+  out += `<text x="${left + (W - left - right) / 2}" y="${H - 3}" font-size="11" fill="var(--sn-ink-mute)" text-anchor="middle">-1 min</text>`;
+  out += `<text x="${W - right}" y="${H - 3}" font-size="11" fill="var(--sn-ink-mute)" text-anchor="end">now</text>`;
+  cols.forEach((c, i) => {
+    const x = left + i * colW + 1;
+    if (c.s) { const hs = Math.max(1, h(c.s) - 1); out += `<rect x="${x}" y="${mid - 1 - hs}" width="${barW}" height="${hs}" rx="1.5" fill="var(--sn-ink-2)"/>`; }
+    if (c.r) { const hr = Math.max(1, h(c.r) - 1); out += `<rect x="${x}" y="${mid + 1}" width="${barW}" height="${hr}" rx="1.5" fill="var(--sn-ink-faint)"/>`; }
+    out += `<rect x="${left + i * colW}" y="${top}" width="${colW}" height="${H - top - bottom}" fill="transparent" data-i="${i}"/>`;
+  });
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.innerHTML = out;
+  svg.onmousemove = (e) => {
+    const i = e.target.dataset?.i, tip = $("pipe-tip");
+    if (i === undefined) { tip.style.display = "none"; return; }
+    const c = cols[i];
+    tip.innerHTML = `<div>${new Date(c.t * 1000).toTimeString().slice(0, 8)}</div><div class="num">Sent ${kb(c.s)}</div><div class="num">Received ${kb(c.r)}</div>`;
+    const bx = box.getBoundingClientRect();
+    tip.style.display = "block";
+    tip.style.left = Math.min(e.clientX - bx.left + 12, bx.width - 130) + "px";
+    tip.style.top = (e.clientY - bx.top - 10) + "px";
+  };
+  svg.onmouseleave = () => { $("pipe-tip").style.display = "none"; };
+}
+setInterval(renderPipeChart, 1000);
+
+// Totals since the tab was opened, and for the latest request.
+// Bytes are what passed; tokens are what the providers reported in usage.
+const pipeTot = { reqs: 0, sent: 0, recv: 0, tin: 0, tout: 0, last: null };
+const kb = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + " MB" : n >= 1e3 ? (n / 1e3).toFixed(1) + " KB" : n + " B";
+const tk = (n) => n.toLocaleString("en-US");
+function pipeTotals() {
+  const t = pipeTot, l = t.last;
+  $("pipe-totals").innerHTML = `shown here: <b>${t.reqs}</b> request${t.reqs === 1 ? "" : "s"}, sent <b>${kb(t.sent)}</b>, received <b>${kb(t.recv)}</b>, ` +
+    `tokens in <b>${tk(t.tin)}</b> / out <b>${tk(t.tout)}</b>` +
+    (l ? `<span class="why">  ·  latest #${esc(l.id.slice(-4))}: sent ${kb(l.sent)}, received ${kb(l.recv)}, tokens in ${tk(l.tin)} / out ${tk(l.tout)}</span>` : "");
+}
+function pipeUsage(id, text) {
+  const p = [...text.matchAll(/"prompt_tokens"\s*:\s*(\d+)/g)], c = [...text.matchAll(/"completion_tokens"\s*:\s*(\d+)/g)];
+  if (!p.length && !c.length) return;
+  const l = pipeTot.last && pipeTot.last.id === id ? pipeTot.last : null;
+  if (!l) return;
+  // A stream may repeat its usage (Groq sends it twice): keep the latest, count it once.
+  const tin = p.length ? +p[p.length - 1][1] : l.tin, tout = c.length ? +c[c.length - 1][1] : l.tout;
+  pipeTot.tin += tin - l.tin; pipeTot.tout += tout - l.tout;
+  l.tin = tin; l.tout = tout;
+}
+function pipeWatch(on) {
+  if (on && !pipe.es) {
+    pipeTotals();
+    pipe.es = new EventSource("/pipe");
+    pipe.es.onopen = () => pipeState(pipe.paused ? "Paused" : "Live", !pipe.paused);
+    pipe.es.onerror = () => pipeState("Connection lost, retrying; the pipe is shown on this machine only", false);
+    // the router replays what it kept on every connect: frames already seen are skipped
+    pipe.es.onmessage = (m) => { const e = JSON.parse(m.data); if (e.n <= pipe.seen) return; pipe.seen = e.n; if (pipe.paused) pipe.held.push(e); else pipeEvent(e); };
+  } else if (!on && pipe.es) {
+    pipe.es.close(); pipe.es = null; pipeState("Not connected", false);
+  }
+}
+// One card per request, newest on top. A card keeps what the client asked, each try at a
+// model (its status, time, error, and the body it sent back), and the raw lines. The
+// answer is read out of the body as it grows: an SSE stream's deltas, or a JSON message.
+function pipeTag(id) {
+  if (!pipe.color.has(id)) pipe.color.set(id, PIPE_COLORS[pipe.color.size % PIPE_COLORS.length]);
+  return `<span class="id" style="color:${pipe.color.get(id)}">#${esc(id.slice(-4))}</span>`;
+}
+const short = (m) => (m || "").split("/").slice(1).join("/") || m || "";
+const pipeCards = new Map();   // id -> card
+function pipeAsked(text) {
+  try {
+    const j = JSON.parse(text);
+    const users = (j.messages || []).filter((m) => m.role === "user");
+    const c = users.at(-1)?.content;
+    return { model: j.model || "", asked: typeof c === "string" ? c : Array.isArray(c) ? c.map((x) => x.text || (x.type ? `[${x.type}]` : "")).join(" ") : "" };
+  } catch {
+    return { model: (text.match(/"model"\s*:\s*"([^"]*)"/) || [])[1] || "", asked: "" };   // cut short: the name is near the start
+  }
+}
+function pipeAnswer(body) {
+  if (!body) return { text: "", think: "" };
+  let text = "", think = "";
+  if (/^\s*data:/m.test(body)) {
+    for (const line of body.split("\n")) {
+      const d = line.match(/^\s*data:\s*(\{.*\})\s*$/); if (!d) continue;
+      try { const c = JSON.parse(d[1]).choices?.[0]; text += c?.delta?.content || ""; think += c?.delta?.reasoning_content || c?.delta?.reasoning || ""; } catch {}
+    }
+  } else {
+    try { const m = JSON.parse(body).choices?.[0]?.message; text = m?.content || ""; think = m?.reasoning_content || ""; } catch {}
+  }
+  return { text, think };
+}
+function pipeCard(id) {
+  let c = pipeCards.get(id);
+  if (!c) {
+    c = { id, t: new Date(pipe.at), model: "", asked: "", label: "", tries: [], raw: [], done: null, open: false, el: document.createElement("div") };
+    c.el.className = "pcard"; c.el.dataset.id = id;
+    pipeCards.set(id, c);
+    $("pipe-tunnel").prepend(c.el);
+    pipeTrim();
+  }
+  return c;
+}
+function pipeRaw(c, dir, text) {
+  if (c.raw.length < 400) c.raw.push(`${new Date(pipe.at).toTimeString().slice(0, 8)}  ${dir}  ${text}`);
+}
+function renderCard(c) {
+  const last = c.tries.at(-1), ans = pipeAnswer(last?.body);
+  const tries = c.tries.map((t) => `<span class="ptry${t.err || (t.status && t.status >= 400) ? " bad" : ""}">${esc(short(t.model))}` +
+    `${t.err ? `: ${esc(t.err)}` : t.status ? ` ${t.status}` : ""}${t.ms ? `, ${(t.ms / 1000).toFixed(1)} s` : t.status || t.err ? "" : ", waiting"}</span>`).join('<span class="why">, then </span>');
+  const state = c.done ? (c.done.status && c.done.status < 400 ? `<span class="s-good">done</span>` : `<span class="s-critical">${c.done.status ? `HTTP ${c.done.status}` : "failed"}</span>`) : `<span class="sn-think__label">answering</span>`;
+  // what the model got, when the filter changed it on the way out
+  const sent = last?.sent && last.sent !== c.asked ? last.sent : "";
+  c.el.innerHTML = `<div class="phead">${pipeTag(c.id)}<span class="why">${c.t.toTimeString().slice(0, 8)}</span>` +
+      (c.label ? `<span class="tag">${esc(c.label)}</span>` : `<span class="pmodel">${esc(c.model || "?")}</span>`) +
+      `<span class="ptries">${tries || '<span class="why">no model yet</span>'}</span><span class="pstate">${state}</span>` +
+      `<button class="small-btn" data-raw="${esc(c.id)}">${c.open ? "Hide raw" : "Raw"}</button></div>` +
+    `<div class="pline"><span class="plab">asked</span><span class="ptext">${esc(c.asked) || '<span class="why">(no text)</span>'}</span></div>` +
+    (sent ? `<div class="pline"><span class="plab">model got</span><span class="ptext">${markPh(sent)}</span></div>` : "") +
+    (ans.think ? `<div class="pline"><span class="plab">thinking</span><span class="ptext why">${esc(ans.think)}</span></div>` : "") +
+    `<div class="pline"><span class="plab">answer</span><span class="ptext">${esc(ans.text) || (last?.body && !c.done ? '<span class="why">...</span>' : last?.body ? `<span class="why">${esc(last.body.slice(0, 300))}</span>` : "")}</span></div>` +
+    (c.open ? `<pre class="praw">${esc(c.raw.join("\n"))}</pre>` : "");
+}
+// cards change many times a second: draw each changed one once per frame
+const pipeDirty = new Set();
+function pipeTouch(c) { pipeDirty.add(c); if (!pipe.scheduled) { pipe.scheduled = true; requestAnimationFrame(() => { pipe.scheduled = false; pipeDirty.forEach(renderCard); pipeDirty.clear(); }); } }
+function pipeTrim() {
+  const keep = +$("pipe-window").value;
+  for (const [id, c] of [...pipeCards].slice(0, Math.max(0, pipeCards.size - keep))) { c.el.remove(); pipeCards.delete(id); }
+}
+function pipeEvent(e) {
+  pipe.at = e.t || Date.now();   // kept frames come late: each is shown at its own time
+  const cut = e.cut ? ` ...[${e.cut} more bytes]` : "";
+  const size = (e.text || "").length + (e.cut || 0);
+  if (e.kind === "client_request") { pipeTot.reqs++; pipeTot.last = { id: e.id, sent: 0, recv: 0, tin: 0, tout: 0 }; }
+  const last = pipeTot.last && pipeTot.last.id === e.id ? pipeTot.last : null;
+  if (e.kind === "upstream_request") { pipeTot.sent += size; pipeCount("s", size); if (last) last.sent += size; }
+  if (e.kind === "upstream_chunk") { pipeTot.recv += size; pipeCount("r", size); if (last) last.recv += size; pipeUsage(e.id, e.text || ""); }
+  pipeTotals();
+  const c = pipeCard(e.id), tryOf = (m) => [...c.tries].reverse().find((t) => t.model === m);
+  switch (e.kind) {
+    case "client_request": Object.assign(c, pipeAsked(e.text || "")); pipeRaw(c, "client to router", e.text + cut); break;
+    case "upstream_request": {
+      const sent = pipeAsked(e.text || "").asked;
+      c.tries.push({ model: e.model, body: "", sent });
+      if (e.label) { c.label = e.label; c.asked = sent; }   // the router's own: no client asked
+      pipeRaw(c, `router to ${short(e.model)}`, e.text + cut);
+      pipeOut(e, sent);
+      break;
+    }
+    case "upstream_status": { const t = tryOf(e.model); if (t) t.status = e.status; pipeRaw(c, `${short(e.model)} to router`, `HTTP ${e.status}`); break; }
+    case "upstream_chunk": { const t = tryOf(e.model); if (t && t.body.length < 200000) t.body += e.text || ""; pipeRaw(c, `${short(e.model)} to router`, (e.text || "").trim() + cut); break; }
+    case "upstream_end": {
+      const t = tryOf(e.model); if (t) { t.ms = e.ms; if (e.error) t.err = e.error; }
+      if (c.label && t) c.done = { status: t.err ? 0 : t.status };   // nothing goes back to a client: done when the model is
+      pipeRaw(c, `${short(e.model)} to router`, e.error ? `failed: ${e.error}` : "end");
+      break;
+    }
+    case "client_chunk": pipeRaw(c, "router to client", (e.text || "").trim() + cut); break;
+    case "client_end": c.done = { status: e.status, model: e.model }; pipeRaw(c, "router to client", `done, HTTP ${e.status}`); break;
+  }
+  pipeTouch(c);
+}
+$("pipe-tunnel").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-raw]"); if (!b) return;
+  const c = pipeCards.get(b.dataset.raw); if (c) { c.open = !c.open; renderCard(c); }
+});
+function pipeState(text, on) {
+  $("pipe-state").textContent = text;
+  $("pipe-dot").className = on ? "ok-dot" : "off-dot";
+}
+// placeholders the filter put in stand out; the text comes in raw and is escaped here
+const markPh = (text) => esc(text).replace(/&lt;([A-Z_]+_\d+)&gt;/g, '<span class="ph">&lt;$1&gt;</span>');
+// The Outgoing view: one line per request to a model, newest on top, the text exactly
+// as the model gets it (after the filter), client requests and the router's own alike
+function pipeOut(e, sent) {
+  const box = $("pipe-out");
+  box.querySelector(".fo-empty")?.remove();
+  const row = document.createElement("div");
+  row.className = "fo";
+  row.innerHTML = `<div class="fo-head"><span class="why">${new Date(pipe.at).toTimeString().slice(0, 8)}</span><span class="pmodel">${esc(short(e.model))}</span>` +
+    (e.label ? `<span class="tag">${esc(e.label)}</span>` : "") + `</div><div class="fo-text">${markPh(sent) || '<span class="why">(no text)</span>'}</div>`;
+  box.prepend(row);
+  while (box.children.length > +$("pipe-window").value) box.lastChild.remove();
+}
+$("pipe-view").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-view]"); if (!b) return;
+  $("pipe-view").querySelectorAll("button").forEach((x) => x.classList.toggle("is-on", x === b));
+  $("pipe-tunnel").hidden = b.dataset.view !== "cards";
+  $("pipe-out").hidden = b.dataset.view !== "out";
+});
+$("pipe-pause").onclick = () => {
+  pipe.paused = !pipe.paused;
+  $("pipe-pause").textContent = pipe.paused ? `Resume (${pipe.held.length} held)` : "Pause";
+  pipeState(pipe.paused ? "Paused" : pipe.es ? "Live" : "Not connected", !pipe.paused && !!pipe.es);
+  if (!pipe.paused) { const h = pipe.held; pipe.held = []; h.forEach(pipeEvent); }
+};
+setInterval(() => { if (pipe.paused) $("pipe-pause").textContent = `Resume (${pipe.held.length} held)`; }, 1000);
+$("pipe-window").onchange = pipeTrim;
+$("pipe-clear").onclick = () => { Object.assign(pipeTot, { reqs: 0, sent: 0, recv: 0, tin: 0, tout: 0, last: null }); pipeTotals(); $("pipe-tunnel").innerHTML = ""; $("pipe-out").innerHTML = ""; pipeCards.clear(); pipe.held = []; };
+
+// ---- tabs
+function showTab(name) {
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.classList.toggle("is-on", b.dataset.tab === name));
+  $("tab-overview").hidden = name !== "overview";
+  $("tab-providers").hidden = name !== "providers";
+  $("tab-pipe").hidden = name !== "pipe";
+  $("tab-filter").hidden = name !== "filter";
+  if (name === "providers") loadProviders();
+  if (name === "filter") loadFilter();
+  pipeWatch(name === "pipe");
+  location.hash = name === "overview" ? "" : name;
+}
+document.querySelector("nav.tabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) showTab(b.dataset.tab); });
+
+// ---- filter tab: the switch, the terms as a list, a way to try it
+const FLT_TYPES = ["ORG", "PERSON", "HOST", "EMAIL", "PHONE", "ADDRESS", "PROJECT", "OTHER"];
+let fltTerms = [], fltOn = false, fltKinds = [];   // [{term, type}]; kinds: the entity catalogue, [{id, name, type}]
+// A term "@id" is not a value but a kind of value (any email, any card number), from the
+// catalogue in entities.json; it sits in the same list as the names.
+const fltKind = (x) => x.term.startsWith("@") ? fltKinds.find((k) => k.id === x.term.slice(1)) || { name: `${x.term.slice(1)} (not in entities.json)`, missing: true } : null;
+const fltLabel = (x) => fltKind(x)?.name || x.term;
+function fltParse(text) {
+  return (text || "").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"))
+    .map((l) => { const [t, ty] = l.split("\t"); return { term: (t || "").trim(), type: (ty || "OTHER").trim().toUpperCase() }; }).filter((x) => x.term);
+}
+async function loadFilter() {
+  const r = await api("/api/filter");
+  if (!r.ok) { $("flt-msg").textContent = r.err || "could not load"; return; }
+  fltOn = r.j.enabled; fltTerms = fltParse(r.j.terms); fltKinds = r.j.entities || [];
+  if (r.j.entities_error) { $("flt-msg").className = "errmsg"; $("flt-msg").textContent = `${r.j.entities_file}: ${r.j.entities_error}`; }
+  $("flt-on").checked = fltOn; renderFilter(); fltTry();
+}
+async function saveFilter(note) {
+  const terms = fltTerms.map((x) => `${x.term}\t${x.type}`).join("\n") + (fltTerms.length ? "\n" : "");
+  const r = await api("/api/filter", { method: "PUT", body: JSON.stringify({ enabled: $("flt-on").checked, terms }) });
+  $("flt-msg").className = r.ok ? "why" : "errmsg";
+  $("flt-msg").textContent = r.ok ? note : (r.err || "not saved");
+  if (r.ok) { fltOn = r.j.enabled; fltTerms = fltParse(r.j.terms); }
+  renderFilter(); fltTry();
+}
+function renderFilter() {
+  const types = [...new Set([...FLT_TYPES, ...fltTerms.filter((x) => !x.term.startsWith("@")).map((x) => x.type)])];
+  const opts = types.map((t) => `<option>${esc(t)}</option>`).join("") +
+    (fltKinds.length ? `<optgroup label="Any value of a kind">${fltKinds.map((k) => `<option value="@${esc(k.id)}">${esc(k.name)}</option>`).join("")}</optgroup>` : "");
+  if ($("flt-type").dataset.opts !== opts) { const v = $("flt-type").value || "ORG"; $("flt-type").innerHTML = opts; $("flt-type").dataset.opts = opts; $("flt-type").value = v; if (!$("flt-type").value) $("flt-type").value = "ORG"; fltKindPicked(); }
+  const q = $("flt-search").value.trim().toLowerCase();
+  const shown = fltTerms.map((x, i) => ({ ...x, i })).filter((x) => !q || fltLabel(x).toLowerCase().includes(q) || x.type.toLowerCase().includes(q));
+  $("flt-list").innerHTML = shown.map((x) => { const k = fltKind(x);
+    return `<div class="flt-row${k ? " is-kind" : ""}${k?.missing ? " bad" : ""}"><span class="flt-t">${esc(fltLabel(x))}</span><span class="tag">${esc(x.type)}</span>` +
+      `<button class="sn-btn sn-btn--ghost" data-fltdel="${x.i}" aria-label="remove ${esc(fltLabel(x))}">Remove</button></div>`; }).join("") ||
+    `<div class="why flt-empty">${fltTerms.length ? `No term matches "${esc(q)}"` : "No terms yet. Add a company, a host, a person: anything you would rather keep from the model."}</div>`;
+  $("flt-search").parentElement.hidden = fltTerms.length < 8;
+}
+function fltAdd(list) {
+  const have = new Set(fltTerms.map((x) => x.term.toLowerCase()));
+  const fresh = list.filter((x) => x.term && !x.term.includes("\t") && !have.has(x.term.toLowerCase()) && have.add(x.term.toLowerCase()));
+  if (!fresh.length) { $("flt-msg").className = "why"; $("flt-msg").textContent = "Already in the list"; return false; }
+  fltTerms.push(...fresh);
+  saveFilter(fresh.length === 1 ? `Added ${fltLabel(fresh[0])}` : `Added ${fresh.length} terms`);
+  return true;
+}
+$("flt-addbtn").onclick = () => {
+  const v = $("flt-type").value;
+  if (v.startsWith("@")) { const k = fltKinds.find((x) => x.id === v.slice(1)); if (k) fltAdd([{ term: v, type: k.type }]); return; }
+  const t = $("flt-term").value.trim(); if (!t) return $("flt-term").focus(); if (fltAdd([{ term: t, type: v }])) $("flt-term").value = "";
+};
+// a kind needs no value typed: the field says so instead
+function fltKindPicked() {
+  const kind = $("flt-type").value.startsWith("@");
+  $("flt-term").disabled = kind;
+  $("flt-term").placeholder = kind ? "Every value of this kind is masked" : "A name, a host, a person...";
+}
+$("flt-type").onchange = fltKindPicked;
+$("flt-term").onkeydown = (e) => { if (e.key === "Enter") $("flt-addbtn").click(); };
+$("flt-pastebtn").onclick = () => { $("flt-paste").hidden = false; $("flt-pastetext").focus(); };
+$("flt-pastecancel").onclick = () => { $("flt-paste").hidden = true; $("flt-pastetext").value = ""; };
+$("flt-pasteadd").onclick = () => {
+  const list = $("flt-pastetext").value.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
+    const m = l.match(/^(.*?)\s*[\t,;]\s*([A-Za-z_]+)$/);
+    return m ? { term: m[1].trim(), type: m[2].toUpperCase() } : { term: l, type: $("flt-type").value };
+  });
+  if (fltAdd(list)) { $("flt-paste").hidden = true; $("flt-pastetext").value = ""; }
+};
+$("flt-list").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-fltdel]"); if (!b) return;
+  const [x] = fltTerms.splice(+b.dataset.fltdel, 1);
+  saveFilter(`Removed ${x.term}`);
+});
+$("flt-search").oninput = renderFilter;
+$("flt-on").onchange = () => saveFilter($("flt-on").checked ? "On: these terms are masked in every request" : "Off: requests go as they are");
+// Test the filter, in a side panel so it is at hand however long the list is: paste a
+// text, press Test, see below what the model would get, from the saved terms
+async function fltTry() {
+  const text = $("flt-trytext").value;
+  if (!text.trim()) return;   // nothing tested yet: the panel's first line stays
+  const r = await api("/api/filter/try", { method: "POST", body: JSON.stringify({ text }) });
+  if (!r.ok) { $("flt-tryout").className = "errmsg"; $("flt-tryout").textContent = r.err || "failed"; return; }
+  const masked = r.j.masked, n = new Set(masked.match(/<[A-Z_]+_\d+>/g) || []).size;
+  $("flt-tryout").className = n ? "flt-out" : "why";
+  // a term matches only whole, so say what the text was checked against
+  $("flt-tryout").innerHTML = !fltTerms.length ? "The list is empty: add terms first."
+    : !n ? `None of your ${fltTerms.length} term${fltTerms.length === 1 ? "" : "s"} is in this text, so the model would get it as it is. A term matches only whole: "John Smith" does not match "John".`
+    : `<div class="why">${n} term${n === 1 ? "" : "s"} masked. ${fltOn ? "The model gets" : "When the filter is on, the model gets"}:</div>` + markPh(masked);
+}
+$("flt-trybtn").onclick = fltTry;
+const FLT_TRY_FIRST = $("flt-tryout").textContent;
+$("flt-tryclear").onclick = () => { $("flt-trytext").value = ""; $("flt-askout").innerHTML = ""; $("flt-tryout").className = "why"; $("flt-tryout").textContent = FLT_TRY_FIRST; $("flt-trytext").focus(); };
+// Paste reads the clipboard where the browser allows it (it asks once); where it does not, Ctrl+V still works
+$("flt-tryclip").onclick = async () => {
+  try { $("flt-trytext").value = await navigator.clipboard.readText(); fltTry(); }
+  catch { $("flt-tryout").className = "why"; $("flt-tryout").textContent = "The browser did not let the page read the clipboard: click the box and press Ctrl+V."; $("flt-trytext").focus(); }
+};
+$("flt-trytext").onkeydown = (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) fltTry(); };
+function fltTestOpen(on) {
+  $("flttest").classList.toggle("is-open", on); $("veil").classList.toggle("is-on", on);
+  if (!on) return;
+  // the models that answer now; "auto" asks the one the router would pick
+  const keep = $("flt-model").value;
+  const keys = models.filter((m) => m.state === "ok").map((m) => m.key).sort();
+  $("flt-model").innerHTML = `<option value="auto">auto: the model the router would pick</option>` + keys.map((k) => `<option>${esc(k)}</option>`).join("");
+  if (keep && [...$("flt-model").options].some((o) => o.value === keep)) $("flt-model").value = keep;
+  $("flt-trytext").focus();
+}
+// The round trip: the text goes to the model masked, the answer comes back as the model
+// wrote it (placeholders and all) and as you get it, with the originals put back
+// A model may take a minute: the wait is shown in seconds, and Stop gives up on it.
+let fltAsking = null;   // { ctl, timer }
+$("flt-askbtn").onclick = async () => {
+  const btn = $("flt-askbtn");
+  if (fltAsking) { fltAsking.ctl.abort(); return; }
+  const text = $("flt-trytext").value;
+  if (!text.trim()) return $("flt-trytext").focus();
+  const model = $("flt-model").value, t0 = Date.now(), ctl = new AbortController();
+  const waiting = () => { $("flt-askout").innerHTML = `<div class="fa-step why"><span class="sn-think__label">Waiting for ${esc(model === "auto" ? "the model" : model)}</span>, ${Math.round((Date.now() - t0) / 1000)} s</div>`; };
+  fltAsking = { ctl, timer: setInterval(waiting, 1000) };
+  btn.textContent = "Stop"; waiting();
+  let r;
+  try { r = await api("/api/filter/ask", { method: "POST", body: JSON.stringify({ text, model }), signal: ctl.signal }); }
+  catch { r = { ok: false, err: "Stopped" }; }
+  clearInterval(fltAsking.timer); fltAsking = null;
+  btn.textContent = "Ask the model";
+  if (ctl.signal.aborted) r = { ok: false, err: "Stopped: no answer was waited for." };
+  if (!r.ok) { $("flt-askout").innerHTML = `<div class="fa-step errmsg">${esc(r.err || "failed")}</div>`; return; }
+  const step = (label, body) => `<div class="fa-step"><div class="why">${label}</div><div class="flt-out">${body}</div></div>`;
+  $("flt-askout").innerHTML = step(`1. ${esc(r.j.model)} got`, markPh(r.j.masked)) +
+    (r.j.error ? `<div class="fa-step errmsg">${esc(r.j.error)}</div>`
+      : step("2. It answered", markPh(r.j.answer) || '<span class="why">(empty)</span>') + step("3. You get back", esc(r.j.restored) || '<span class="why">(empty)</span>'));
+};
+$("flt-testbtn").onclick = () => fltTestOpen(true);
+document.addEventListener("click", (e) => { if (e.target.id === "flt-testx" || (e.target.id === "veil" && $("flttest").classList.contains("is-open"))) fltTestOpen(false); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("flttest").classList.contains("is-open")) fltTestOpen(false); });
+
+// ---- calls that change something carry the UI header (and the router token, when one is set)
+async function api(url, opts = {}) {
+  const headers = { "X-Router-UI": "1", ...(opts.headers || {}) };
+  const tok = localStorage.getItem("router-token");
+  if (tok) headers["X-Router-Token"] = tok;
+  let r = await fetch(url, { ...opts, headers });
+  if (r.status === 401) {
+    const t = prompt("This router needs its token (ROUTER_TOKEN):");
+    if (t) { localStorage.setItem("router-token", t); headers["X-Router-Token"] = t; r = await fetch(url, { ...opts, headers }); }
+  }
+  let j = {}; try { j = await r.json(); } catch {}
+  return { ok: r.ok, status: r.status, j, err: j.error?.message };
+}
+
+// ---- providers tab
+const PSTATE = (s) => s === "ok" ? ["s-good", "●", "On"] : s === "no key" ? ["s-muted", "○", "No key"] : s === "disabled" ? ["s-muted", "–", "Off"] :
+  s.startsWith("needs") ? ["s-warning", "▲", s] : s.startsWith("off") ? ["s-critical", "✕", s] : ["s-serious", "◆", s];
+let providers = [], pvOpen = null;   // pvOpen: the provider in the side panel, "" for a new one
+async function loadProviders() {
+  const r = await fetch("/api/providers"); providers = (await r.json()).providers || [];
+  renderProviders();
+  if (pvOpen && !$("pvedit").contains(document.activeElement)) renderPv();   // never under the typing
+}
+// In use: on, with a key or needing none. Needs a key: on, but no key yet. Off: turned off
+// here, or shipped off for a reason (its note says why).
+const pvGroup = (p) => !p.on ? "Off" : p.key_mode === "required" && !p.keys?.length ? "Needs a key" : "In use";
+const pvKeys = (p) => p.keys?.length ? plural(p.keys.length, "key") : p.key_mode === "optional" ? "no key needed" : "";
+function renderProviders() {
+  const q = $("pv-search").value.trim().toLowerCase();
+  const list = providers.filter((p) => !q || `${p.name} ${p.id} ${p.base_url}`.toLowerCase().includes(q));
+  const rows = [];
+  for (const g of ["In use", "Needs a key", "Off"]) {
+    const ps = list.filter((p) => pvGroup(p) === g);
+    if (!ps.length) continue;
+    rows.push(`<tr class="pv-grp"><td colspan="7">${g} <span class="why">${ps.length}</span></td></tr>`);
+    for (const p of ps) {
+      const [cls, icon, text] = PSTATE(p.state);
+      const end = g === "Needs a key" ? `<button class="small-btn" data-pvkey="${esc(p.id)}">Add key</button>`
+        : `<label class="sn-switch" title="${p.on ? "turn off" : "turn on"}"><input type="checkbox" role="switch" data-pvon="${esc(p.id)}"${p.on ? " checked" : ""}></label>`;
+      rows.push(`<tr class="prow${pvOpen === p.id ? " is-sel" : ""}" data-pv="${esc(p.id)}"><td class="pvn">${esc(p.name)}${p.custom ? '<span class="tag">yours</span>' : ""}</td>` +
+        `<td><span class="state ${cls}"><b>${icon}</b>${esc(text)}</span></td><td>${p.on && p.keys?.length + (p.key_mode === "optional") ? usuallyLabel(p.usually) : ""}</td>` +
+        `<td class="r num">${p.models || ""}</td><td class="why">${esc(pvKeys(p))}</td><td class="why">${p.trains ? "may train" : ""}</td><td class="r">${end}</td></tr>`);
+    }
+  }
+  $("providers").tBodies[0].innerHTML = rows.join("") || `<tr><td colspan="7" class="empty">No provider matches "${esc(q)}"</td></tr>`;
+  titleCells($("providers"));
+}
+$("pv-search").oninput = renderProviders;
+// the panel: one provider, or the form for a new one
+function openPv(id, focusKey) {
+  pvOpen = id; renderPv(); renderProviders();
+  $("pvedit").classList.add("is-open"); $("veil").classList.add("is-on");
+  setTimeout(() => (focusKey ? $("pv-key") : id === "" ? $("pv-id") : null)?.focus(), 250);
+}
+function closePv() { pvOpen = null; $("pvedit").classList.remove("is-open"); if (!tshowing) $("veil").classList.remove("is-on"); renderProviders(); }
+function pvMsg(text, ok) { const m = $("pv-msg"); if (m) { m.className = ok ? "okmsg" : "errmsg"; m.textContent = text; } }
+function renderPv() {
+  if (pvOpen === "") {
+    $("pv-title").textContent = "Add a provider";
+    $("pv-actions").innerHTML = `<span class="summary">Any OpenAI-compatible API with a GET /models list</span><span id="pv-msg"></span><button class="sn-btn sn-btn--primary" id="pv-add">Add provider</button>`;
+    $("pv-body").innerHTML = `
+      <div class="field"><label>Name</label><input type="text" id="pv-id" placeholder="e.g. mylab" autocomplete="off"></div>
+      <div class="field"><label>Base URL, the part before /chat/completions</label><input type="text" id="pv-url" placeholder="https://api.example.com/v1" autocomplete="off"></div>
+      <div class="field"><label>Key, if it needs one</label><input type="password" id="pv-newkey" autocomplete="off"></div>
+      <div class="field"><label>Models to use</label><select id="pv-discover"><option value="all">All it lists</option><option value="free">Only those priced zero</option></select></div>
+      <label class="sn-switch"><input type="checkbox" role="switch" id="pv-trains">May train on prompts</label>`;
+    return;
+  }
+  const p = providers.find((x) => x.id === pvOpen); if (!p) return closePv();
+  const [cls, icon, text] = PSTATE(p.state);
+  $("pv-title").textContent = p.name;
+  $("pv-actions").innerHTML = `<span class="state ${cls}"><b>${icon}</b>${esc(text)}</span><span class="summary">${[p.models ? plural(p.models, "model") : "", p.trains ? "may train on prompts" : "does not train on prompts"].filter(Boolean).join(", ")}</span>` +
+    `<span id="pv-msg"></span>` + (pvGroup(p) === "Needs a key" ? "" : `<label class="sn-switch" title="${p.on ? "turn off" : "turn on"}"><input type="checkbox" role="switch" data-pvon="${esc(p.id)}"${p.on ? " checked" : ""} aria-label="On"></label>`) +
+    `<button class="sn-btn sn-btn--ghost danger-text" id="pv-remove">Remove</button>`;
+  const notes = [p.disabled, p.note, p.key_note].filter(Boolean).map((t) => `<p>${esc(t)}</p>`).join("");
+  const vars = Object.entries(p.vars || {}).map(([n, v]) => `<div class="pv-addrow"><input type="text" data-var="${esc(n)}" placeholder="${esc(n)}" value="${esc(v)}" autocomplete="off"><button class="sn-btn sn-btn--ghost" data-savevar="${esc(n)}">Save</button></div>`).join("");
+  const keys = (p.keys || []).map((k) => `<div class="pv-key${k.refused ? " bad" : ""}"><span class="mono">${esc(k.masked)}</span><span class="why">${esc([k.label, k.source === "env" ? "from wend.env" : "", k.refused ? "refused: " + k.refused : k.in_use ? "in use" : "spare"].filter(Boolean).join(", "))}</span>` +
+    (k.source === "env" ? "" : `<button class="sn-btn sn-btn--ghost" data-delkey="${esc(k.id)}">Remove</button>`) + `</div>`).join("");
+  let host = ""; try { host = p.signup_url ? new URL(p.signup_url).host : ""; } catch {}
+  $("pv-body").innerHTML = (notes ? `<div class="pv-notes">${notes}</div>` : "") +
+    `<h3 class="grp">Address</h3><div class="mono pv-url">${esc(p.base_url)}</div>${vars}` +
+    `<h3 class="grp">Keys</h3>${keys || `<div class="why">${p.key_mode === "optional" ? "None. It works without a key." : "None yet. Its models are not used until a key is added."}</div>`}` +
+    `<div class="pv-addrow"><input type="password" id="pv-key" placeholder="${p.keys?.length ? "Another key" : "Paste a key"}" autocomplete="off"><input type="text" id="pv-label" placeholder="Label, optional" autocomplete="off"><button class="sn-btn sn-btn--primary" id="pv-addkey">Add key</button></div>` +
+    (host ? `<div class="why">Get a key at <a href="${esc(p.signup_url)}" target="_blank" rel="noopener">${esc(host)}</a></div>` : "");
+}
+// one handler for the list and the panel
+async function pvAct(e) {
+  const t = e.target, row = t.closest("tr[data-pv]");
+  if (t.matches("[data-pvon]")) {
+    const id = t.dataset.pvon, on = t.checked;
+    const r = await api(`/api/providers/${encodeURIComponent(id)}/enabled`, { method: "POST", body: JSON.stringify({ enabled: on }) });
+    if (!r.ok) pvMsg(r.err, false);
+  } else if (t.closest("[data-pvkey]")) {
+    return openPv(t.closest("[data-pvkey]").dataset.pvkey, true);
+  } else if (t.closest(".sn-switch")) {
+    return;   // the label of a switch: its input does the work
+  } else if (row && e.type === "click") {
+    return pvOpen === row.dataset.pv ? closePv() : openPv(row.dataset.pv);
+  } else if (t.id === "pv-addkey") {
+    const key = $("pv-key").value.trim(), label = $("pv-label").value.trim();
+    if (!key) return pvMsg("Paste a key first.", false);
+    t.disabled = true; t.textContent = "Checking...";
+    const r = await api(`/api/providers/${encodeURIComponent(pvOpen)}/keys`, { method: "POST", body: JSON.stringify({ key, label }) });
+    t.disabled = false; t.textContent = "Add key";
+    if (!r.ok) return pvMsg(r.err, false);
+    $("pv-key").value = $("pv-label").value = "";
+    pvMsg(r.j.warning ? `Added, but: ${r.j.warning}` : "Key added; its models are being found and checked", !r.j.warning);
+  } else if (t.dataset.delkey) {
+    if (!confirm("Remove this key? It is deleted from this machine.")) return;
+    const r = await api(`/api/providers/${encodeURIComponent(pvOpen)}/keys/${encodeURIComponent(t.dataset.delkey)}`, { method: "DELETE" });
+    if (!r.ok) return pvMsg(r.err, false);
+  } else if (t.dataset.savevar) {
+    const n = t.dataset.savevar, v = $("pv-body").querySelector(`[data-var="${n}"]`).value;
+    const r = await api(`/api/providers/${encodeURIComponent(pvOpen)}/vars`, { method: "POST", body: JSON.stringify({ [n]: v }) });
+    pvMsg(r.ok ? `${n} saved` : r.err, r.ok);
+  } else if (t.id === "pv-remove") {
+    const p = providers.find((x) => x.id === pvOpen);
+    if (!confirm(`Remove ${p.name}? Its models leave every profile and its keys added here are deleted.`)) return;
+    const r = await api(`/api/providers/${encodeURIComponent(pvOpen)}`, { method: "DELETE" });
+    if (!r.ok) return pvMsg(r.err, false);
+    closePv();
+  } else if (t.id === "pv-add") {
+    const body = { id: $("pv-id").value.trim().toLowerCase(), base_url: $("pv-url").value.trim(), key: $("pv-newkey").value.trim(), discover: $("pv-discover").value, trains_on_free: $("pv-trains").checked };
+    if (!body.id || !body.base_url) return pvMsg("A name and a base URL, please.", false);
+    t.disabled = true;
+    const r = await api("/api/providers", { method: "POST", body: JSON.stringify(body) });
+    t.disabled = false;
+    if (!r.ok) return pvMsg(r.err, false);
+    pvOpen = r.j.added || body.id;
+  } else return;
+  await loadProviders(); if (pvOpen !== null) renderPv();
+  setTimeout(loadProviders, 4000);   // models are found in the background
+}
+$("providers").addEventListener("click", pvAct);
+$("providers").addEventListener("change", pvAct);
+$("pvedit").addEventListener("click", (e) => { if (e.target.closest("button")) pvAct(e); });
+$("pvedit").addEventListener("change", (e) => { if (e.target.matches("[data-pvon]")) pvAct(e); });
+$("pvedit").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id === "pv-key") $("pv-addkey").click(); });
+$("pv-new").onclick = () => openPv("");
+document.addEventListener("click", (e) => { if (e.target.id === "pv-close" || (e.target.id === "veil" && pvOpen !== null)) closePv(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && pvOpen !== null) closePv(); });
+setInterval(() => { if (!$("tab-providers").hidden) loadProviders(); }, 15000);
+if (location.hash === "#providers") showTab("providers");
+if (location.hash === "#pipe") showTab("pipe");
+if (location.hash === "#filter") showTab("filter");
+
+// ---- sortable tables: click a header for ascending, again for descending, a third time for the default order
+const sorts = { models: null };
+function sortableHeaders(tableId, render) {
+  const head = $(tableId).tHead;
+  head.addEventListener("click", (e) => {
+    const th = e.target.closest("th[data-sort]"); if (!th) return;
+    const s = sorts[tableId], k = th.dataset.sort;
+    sorts[tableId] = !s || s.key !== k ? { key: k, dir: 1 } : s.dir === 1 ? { key: k, dir: -1 } : null;
+    head.querySelectorAll("th[data-sort]").forEach((h) => {
+      if (sorts[tableId]?.key === h.dataset.sort) h.dataset.dir = sorts[tableId].dir === 1 ? "up" : "down"; else delete h.dataset.dir;
+    });
+    render();
+  });
+}
+// Missing values sort last whichever way.
+function sortBy(list, value, dir) {
+  return list.map((x, i) => [x, value(x), i]).sort((a, b) => {
+    const va = a[1], vb = b[1], na = va === null || va === undefined || Number.isNaN(va), nb = vb === null || vb === undefined || Number.isNaN(vb);
+    if (na !== nb) return na ? 1 : -1;
+    if (na || va === vb) return a[2] - b[2];
+    return (va < vb ? -1 : 1) * dir;
+  }).map((t) => t[0]);
+}
+const STATE_RANK = { ok: 0, untested: 1, failing: 2, quota: 3, open: 4, gone: 5, "provider-off": 6 };
+const USUALLY_RANK = { stable: 0, "mostly ok": 1, flaky: 2, new: 3 };
+const MODEL_SORT = {
+  score: (r) => (r.m.test ? -r.m.test.score : null), state: (r) => STATE_RANK[r.st] ?? 9, model: (r) => r.m.key, tier: (r) => r.m.tier,
+  ttft: (r) => r.m.ttft_ms || null, tps: (r) => (r.m.tps ? -r.m.tps : null), cost: (r) => r.cost,
+  inflight: (r) => -(r.m.inflight || 0), rpm: (r) => -(r.m.rpm || 0), avail: (r) => (r.m.availability < 0 ? null : -r.m.availability),
+  usually: (r) => USUALLY_RANK[r.m.usually] ?? 9, ok: (r) => -(r.m.ok || 0), touch: (r) => (r.m.last_touch ? -Date.parse(r.m.last_touch) : null),
+};
+sortableHeaders("models", () => { dirty = true; });
+async function loadTraffic() {
+  const j = await (await fetch("/api/traffic")).json();
+  $("traffic").checked = j.on;
+  $("traffic-dir").textContent = j.on ? `on: every request and answer goes to ${j.dir}, kept ${j.days} days` : "off: prompts and answers are not written anywhere";
+}
+$("traffic").onchange = async () => {
+  const r = await api("/api/traffic", { method: "POST", body: JSON.stringify({ on: $("traffic").checked }) });
+  if (!r.ok) $("traffic").checked = !$("traffic").checked;
+  loadTraffic();
+};
+// ---- folding cards: a chevron on each heading; folded ones are remembered by their title
+(() => {
+  let folded = {}; try { folded = JSON.parse(localStorage.getItem("pro-folded") || "{}"); } catch {}
+  document.querySelectorAll("main .card").forEach((card) => {
+    const h = card.querySelector(":scope > h2"); if (!h) return;
+    const key = h.firstChild.textContent.trim();
+    const hint = h.querySelector(".hint"); if (hint && hint.textContent) hint.title = hint.textContent;   // a long hint is cut to one line
+    const b = document.createElement("button");
+    b.className = "fold"; b.innerHTML = '<span class="sn-row__chev"></span>';
+    const set = (f) => { card.classList.toggle("is-folded", f); b.title = f ? "Show" : "Fold"; b.setAttribute("aria-expanded", String(!f)); };
+    set(!!folded[key]);
+    b.onclick = () => {
+      const f = !card.classList.contains("is-folded"); set(f);
+      if (f) folded[key] = true; else delete folded[key];
+      try { localStorage.setItem("pro-folded", JSON.stringify(folded)); } catch {}
+      dirty = true;   // a card opened again draws at its real size
+    };
+    h.appendChild(b);
+  });
+})();
+loadTraffic();
+connect();
+loadProfiles(false);
+frame();
+</script>
+<script src="/ui/help.js"></script>
+<script>wendHelp(document.getElementById("help-btn"), () => document.querySelector(".tabs .is-on")?.dataset.tab || "overview");</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+name: release
+
+# A tag v* builds the binaries, the source tarball the installers build from, and their
+# checksums, and publishes them as a GitHub release with that version's CHANGELOG section.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./... && go test ./...
+      - name: build
+        run: |
+          v=${GITHUB_REF_NAME#v}
+          mkdir dist
+          for t in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            os=${t%/*}; arch=${t#*/}; ext=; [ "$os" = windows ] && ext=.exe
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$v" \
+              -o "dist/wend-$os-$arch$ext" ./cmd/wend
+          done
+          git archive --format=tar.gz -o dist/wend-src.tar.gz HEAD
+          (cd dist && sha256sum * > SHA256SUMS)
+          cat dist/SHA256SUMS
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=${GITHUB_REF_NAME#v}
+          awk -v v="$v" '/^## /{p = index($0, "[" v "]") > 0; next} p && !/^\[/' CHANGELOG.md > notes.md
+          gh release create "$GITHUB_REF_NAME" dist/* --title "Wend router $v" --notes-file notes.md

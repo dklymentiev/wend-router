@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wend router</title>
+<script>
+// Pro is remembered: /dashboard opens it straight away for someone who chose it.
+try { if (localStorage.getItem("router-mode") === "pro") location.replace("/pro" + location.hash); } catch {}
+// The kit themes by data-theme on <html>; follow the system setting.
+(() => { const d = matchMedia("(prefers-color-scheme: dark)"); const set = () => { document.documentElement.dataset.theme = d.matches ? "dark" : "light"; }; set(); d.addEventListener("change", set); })();
+</script>
+<link rel="stylesheet" href="/ui/kit.css">
+<style>
+/* The Simple page: geometry and a few page parts. Colours, radii and fonts are the kit's tokens. */
+@layer app {
+  body { color: var(--sn-ink-2); }
+  :root[data-theme="dark"] { color-scheme: dark; }   /* native lists and controls follow the dark theme */
+  .sn-page--wide { max-width: var(--sn-content-max-dash); }   /* the same width as Pro */
+  .top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .top .sn-page__title { flex: 1; display: flex; align-items: center; gap: 14px; }
+  .run { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--sn-ink-2); }
+  .ok-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sn-on); flex: 0 0 auto; }
+  .off-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sn-ink-faint); flex: 0 0 auto; }
+  .mode { width: 170px; }
+
+  /* three bands of two cards; cards in a row are as tall as the tallest, their closing rows at the bottom */
+  .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; align-items: stretch; }
+  .two > * { min-width: 0; }
+  .two > .sn-section { display: flex; flex-direction: column; }
+  .two > .sn-section > .sn-group { flex: 1; }
+  .two .sn-group { display: flex; flex-direction: column; }
+  .two .sn-group > .showall, .two .sn-group > #more-prov, .two .sn-group > .cfoot { margin-top: auto; }
+  .two .sn-group > .showall + #more-prov { margin-top: 0; }
+  .activity > .sn-group:first-child { display: flex; flex-direction: column; }
+  .activity .chart { flex: 1; display: flex; flex-direction: column; }
+  .activity .bars { flex: 1; height: auto; min-height: 56px; }
+  @media (max-width: 960px) { .two { grid-template-columns: minmax(0, 1fr); } .activity { gap: 12px; } }
+  @media (max-width: 600px) {
+    .top .sn-page__title { flex-basis: 100%; }
+    .sn-row__sub--wrap { display: block; -webkit-line-clamp: unset; overflow: visible; }
+    #profiles .sn-row { flex-wrap: wrap; }
+    #profiles .sn-row__main { flex-basis: 100%; }
+    #profiles .sn-row__end { margin-left: auto; }
+  }
+
+  .sn-row__end { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+  .slot { width: 42px; flex: 0 0 auto; }               /* keeps buttons aligned on rows without a switch */
+  .sn-row__icon { font: 600 12px var(--sn-font); color: var(--sn-ink-2); }
+  .code { font: 13px var(--sn-mono); color: var(--sn-ink); }
+  .fail { color: var(--sn-danger); }
+  .head-btn { height: var(--sn-ctl-h); display: inline-flex; align-items: center; padding: 0 14px !important; font: 600 13px var(--sn-font) !important; border-radius: var(--sn-r-sm) !important; white-space: nowrap; }
+  .sn-section__title .head-btn { color: var(--sn-ink); border: 1px solid var(--sn-rule); }
+  .sn-empty { padding: 14px 16px; font-size: 14px; }
+
+  /* connect: one text to paste, a model picker, one Copy, Test */
+  .cbar { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--sn-rule-2); }
+  .cbar .sn-seg { margin-right: auto; }
+  .pickm { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--sn-ink-mute); }
+  select.inl { appearance: none; -webkit-appearance: none; color: var(--sn-ink); cursor: pointer; font: 13px var(--sn-mono);
+    background: var(--sn-inset); border: 1px solid var(--sn-rule); border-radius: var(--sn-r-sm); height: var(--sn-ctl-h); padding: 0 26px 0 10px; width: 190px; min-width: 0;
+    background-image: linear-gradient(45deg, transparent 50%, var(--sn-ink-mute) 50%), linear-gradient(135deg, var(--sn-ink-mute) 50%, transparent 50%);
+    background-position: calc(100% - 13px) 55%, calc(100% - 8px) 55%; background-size: 5px 5px; background-repeat: no-repeat; }
+  select.inl option, select.inl optgroup { background: var(--sn-surface); color: var(--sn-ink); }
+  select.inl:hover { border-color: var(--sn-ink-faint); }
+  .snipwrap { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; }
+  .snip { flex: 1; min-width: 0; margin: 0; font: 14px/1.6 var(--sn-mono); color: var(--sn-ink); white-space: pre-wrap; overflow-x: auto; }
+  .cfoot { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--sn-rule-2); font-size: 13px; color: var(--sn-ink-mute); }
+  .cfoot > span { flex: 1; min-height: 20px; display: flex; align-items: center; gap: 8px; }
+  .cfoot .ok-line { color: var(--sn-ink-2); cursor: default; }
+  .cfoot b { color: var(--sn-ink); font: 600 13px var(--sn-mono); }
+  #clients .sn-row__meta { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* profiles */
+  .pname { font: 600 15px var(--sn-mono); color: var(--sn-ink); }
+  /* a profile row: name and rules on the left, its counts in the middle, actions on the right */
+  #profiles .chips, #l-list .chips { display: flex; gap: 6px; flex: 0 0 auto; justify-content: flex-end; min-width: 200px; }
+
+  /* the chart: whole-pixel HTML bars on a baseline; the failed share is the top of its bar */
+  .chart { padding: 6px 16px 14px; }
+  .bars { display: flex; align-items: flex-end; gap: 3px; height: 56px; border-bottom: 1px solid var(--sn-rule); }
+  .bar { flex: 1; display: flex; flex-direction: column; background: var(--sn-ink-2); border-radius: 2px 2px 0 0; overflow: hidden; min-height: 0; }
+  .bar.is-empty { background: transparent; }
+  .bar > i { display: block; background: var(--sn-danger); }
+  .axis { display: flex; justify-content: space-between; font-size: 12px; color: var(--sn-ink-faint); margin-top: 6px; }
+
+  /* drawers: the profile builder, adding a provider, a whole list */
+  .sn-drawer__body .sn-section { margin-top: 20px; }
+  .sn-drawer__body .sn-section:first-child { margin-top: 4px; }
+  .sn-drawer__foot { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-top: 1px solid var(--sn-rule-2); }
+  .sn-drawer__foot .count { flex: 1; font-size: 13px; color: var(--sn-ink-mute); }
+  .sn-drawer__foot .count b { color: var(--sn-ink); font-weight: 600; }
+  .danger-text { color: var(--sn-danger) !important; }
+  .fam .sn-row { min-height: 52px; }
+  .fam .sn-row.sub { min-height: 44px; padding-left: 52px; background: var(--sn-surface-2); }
+  .fam .sn-row.sub .sn-row__title { font-size: 14px; }
+  .unfold { flex: 0 0 auto; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: var(--sn-r-sm); background: none; cursor: pointer; margin-left: -6px; }
+  .unfold:hover { background: var(--sn-inset); }
+  .unfold .sn-row__chev { margin: 0; transition: transform var(--sn-t-fast); }
+  .unfold.is-open .sn-row__chev { transform: rotate(135deg); }
+  .search { margin-bottom: 10px; }
+  .rules { font-size: 13px; color: var(--sn-ink-mute); margin: 0 4px 10px; }
+  .own .sn-field + .sn-field { margin-top: 8px; }
+  .own .sn-btn { margin-top: 12px; }
+  .own .msg { margin-top: 8px; font-size: 13px; color: var(--sn-danger); min-height: 18px; }
+  .veil { position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: calc(var(--sn-z-overlay) - 1); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .veil.is-on { opacity: 1; pointer-events: auto; }
+
+  /* dialogs */
+  .key-dlg { width: min(440px, calc(100vw - 32px)); }
+  .key-dlg .sn-field { margin-top: 18px; }
+  .key-dlg .steps { margin: 14px 0 0; padding-left: 18px; font-size: 14px; line-height: 1.6; color: var(--sn-ink-2); }
+  .key-dlg .steps a { color: var(--sn-ink); text-decoration: underline; text-underline-offset: 2px; }
+  .key-dlg .msg { min-height: 20px; margin-top: 10px; font-size: 13px; color: var(--sn-ink-mute); }
+  .key-dlg .msg.is-bad { color: var(--sn-danger); }
+}
+</style>
+</head>
+<body>
+<div class="sn-page sn-page--wide">
+  <div class="top">
+    <h1 class="sn-page__title"><span class="sn-logo" aria-label="Wend router"><b>WEND</b><small aria-hidden="true"><span>r</span><span>o</span><span>u</span><span>t</span><span>e</span><span>r</span></small></span><button class="sn-help" id="help-btn" aria-label="Help for this page" title="Help for this page">?</button></h1>
+    <span class="run"><span class="off-dot" id="run-dot"></span><span id="run">connecting</span></span>
+    <div class="sn-seg sn-seg--slide mode" style="--n:2"><span class="sn-seg__thumb"></span><button class="is-on">Simple</button><button id="to-pro">Pro</button></div>
+  </div>
+
+  <!-- 1. is it working -->
+  <section class="sn-section">
+    <h2 class="sn-section__title">Activity <small>last 10 minutes</small></h2>
+    <div class="two activity">
+      <div class="sn-group">
+        <div class="sn-row"><span class="sn-row__main"><span class="sn-row__title" id="act-title">No requests yet</span><span class="sn-row__sub" id="act-sub">Copy the settings below into a tool and press Test.</span></span></div>
+        <div class="chart"><div class="bars" id="bars"></div><div class="axis"><span>10 min ago</span><span>now</span></div></div>
+      </div>
+      <div class="sn-group" id="recent"></div>
+    </div>
+  </section>
+
+  <!-- 2. connecting, and who is connected -->
+  <div class="two">
+    <section class="sn-section">
+      <h2 class="sn-section__title">Connect your agent <small>paste into your tool, in place of OpenAI</small></h2>
+      <div class="sn-group">
+        <div class="cbar">
+          <div class="sn-seg" id="how"><button class="is-on" data-how="any">Settings</button><button data-how="flint">Flint</button><button data-how="python">Python</button><button data-how="curl">curl</button></div>
+          <label class="pickm"><span>Model</span><select class="inl" id="use-model" aria-label="Model"></select></label>
+        </div>
+        <div class="snipwrap" data-panel="any"><pre class="snip" data-tpl="any"></pre><button class="sn-btn sn-btn--ghost" data-copysnip>Copy</button></div>
+        <div class="snipwrap" data-panel="flint" hidden><pre class="snip" data-tpl="flint"></pre><button class="sn-btn sn-btn--ghost" data-copysnip>Copy</button></div>
+        <div class="snipwrap" data-panel="python" hidden><pre class="snip" data-tpl="python"></pre><button class="sn-btn sn-btn--ghost" data-copysnip>Copy</button></div>
+        <div class="snipwrap" data-panel="curl" hidden><pre class="snip" data-tpl="curl"></pre><button class="sn-btn sn-btn--ghost" data-copysnip>Copy</button></div>
+        <div class="cfoot"><span id="cnote">API key: any text, the router does not check it. Model: a profile, or one model alone, with no switching.</span><button class="sn-btn sn-btn--ghost" id="test">Test</button></div>
+      </div>
+    </section>
+    <section class="sn-section">
+      <h2 class="sn-section__title">Clients <small>tools that used the router in the last hour</small></h2>
+      <div class="sn-group" id="clients"></div>
+    </section>
+  </div>
+
+  <!-- 3. setting it up -->
+  <div class="two">
+    <section class="sn-section">
+      <h2 class="sn-section__title">Providers <small>where the models come from</small><button class="head-btn" id="add-prov">+ Add provider</button></h2>
+      <div class="sn-group" id="providers"><div class="sn-empty">Loading</div></div>
+    </section>
+    <section class="sn-section">
+      <h2 class="sn-section__title">Profiles <small>what your agent asks for</small><button class="head-btn" id="new-profile">+ New profile</button></h2>
+      <div class="sn-group" id="profiles"><div class="sn-empty">Loading</div></div>
+    </section>
+  </div>
+</div>
+
+<div class="veil" id="veil"></div>
+
+<!-- the profile builder -->
+<aside class="sn-drawer" id="drawer" aria-label="Profile">
+  <div class="sn-drawer__head"><h3 id="dr-title">New profile</h3><button class="sn-drawer__x" data-close aria-label="Close">&times;</button></div>
+  <div class="sn-drawer__body">
+    <section class="sn-section">
+      <h2 class="sn-section__title">Name <small>your agent sends it as the model</small></h2>
+      <div class="sn-field"><input id="p-name" placeholder="e.g. gemini" autocomplete="off"></div>
+    </section>
+    <section class="sn-section">
+      <h2 class="sn-section__title">Models <small>open a model to pick providers</small></h2>
+      <p class="rules" id="p-rules" hidden></p>
+      <div class="sn-field search"><input id="p-search" placeholder="Search models" autocomplete="off"></div>
+      <div class="sn-group fam" id="families"></div>
+    </section>
+    <section class="sn-section">
+      <h2 class="sn-section__title">Conditions</h2>
+      <div class="sn-group">
+        <label class="sn-row"><span class="sn-row__main"><span class="sn-row__title">For agents with tools</span><span class="sn-row__sub">Only models that can call tools</span></span>
+          <span class="sn-row__end"><span class="sn-switch"><input type="checkbox" role="switch" id="c-tools"></span></span></label>
+        <label class="sn-row"><span class="sn-row__main"><span class="sn-row__title">Private only</span><span class="sn-row__sub">Skip providers that may train on prompts</span></span>
+          <span class="sn-row__end"><span class="sn-switch"><input type="checkbox" role="switch" id="c-private"></span></span></label>
+        <label class="sn-row"><span class="sn-row__main"><span class="sn-row__title">Allow paid</span><span class="sn-row__sub" id="c-paid-sub">Only after the free ones, within the daily budget</span></span>
+          <span class="sn-row__end"><span class="sn-switch"><input type="checkbox" role="switch" id="c-paid"></span></span></label>
+      </div>
+    </section>
+  </div>
+  <div class="sn-drawer__foot"><button class="sn-btn sn-btn--ghost danger-text" id="p-delete">Delete</button><span class="count" id="p-count"></span><button class="sn-btn sn-btn--primary" id="p-save">Save</button></div>
+</aside>
+
+<!-- a whole list, opened from its "N more" row -->
+<aside class="sn-drawer" id="ldrawer" aria-label="All items">
+  <div class="sn-drawer__head"><h3 id="l-title">All</h3><button class="sn-drawer__x" data-close aria-label="Close">&times;</button></div>
+  <div class="sn-drawer__body"><div class="sn-group" id="l-list"></div></div>
+</aside>
+
+<!-- adding a provider -->
+<aside class="sn-drawer" id="pdrawer" aria-label="Add a provider">
+  <div class="sn-drawer__head"><h3>Add a provider</h3><button class="sn-drawer__x" data-close aria-label="Close">&times;</button></div>
+  <div class="sn-drawer__body">
+    <section class="sn-section">
+      <h2 class="sn-section__title">From the list <small>known providers</small></h2>
+      <div class="sn-group" id="catalog"></div>
+    </section>
+    <section class="sn-section own">
+      <h2 class="sn-section__title">Your own server <small>any OpenAI-compatible API with GET /models</small></h2>
+      <div class="sn-field"><input id="o-name" placeholder="Name, e.g. my-ollama" autocomplete="off"></div>
+      <div class="sn-field"><input id="o-url" placeholder="Base URL, e.g. http://localhost:11434/v1" autocomplete="off"></div>
+      <div class="sn-field"><input id="o-key" type="password" placeholder="Key, if it needs one" autocomplete="off"></div>
+      <button class="sn-btn sn-btn--primary" id="o-add">Add server</button>
+      <div class="msg" id="o-msg"></div>
+    </section>
+  </div>
+</aside>
+
+<dialog class="sn-dialog key-dlg" id="key-dlg">
+  <p class="sn-dialog__q" id="key-q">Add a key</p>
+  <p class="sn-dialog__note" id="key-note"></p>
+  <ol class="steps" id="key-steps"><li>Sign in at <a id="key-link" href="#" target="_blank" rel="noopener">the provider's site</a>.</li><li>Create an API key and copy it.</li><li>Paste it here.</li></ol>
+  <div class="sn-field"><input type="password" id="key-input" placeholder="Paste the key" autocomplete="off"></div>
+  <div class="msg" id="key-msg"></div>
+  <div class="sn-dialog__row"><button class="sn-btn sn-btn--ghost danger-text" id="key-remove" style="margin-right:auto">Remove provider</button><button class="sn-btn sn-btn--ghost" id="key-cancel">Cancel</button><button class="sn-btn sn-btn--primary" id="key-ok">Add key</button></div>
+</dialog>
+
+<dialog class="sn-dialog" id="confirm">
+  <p class="sn-dialog__q" id="cf-q"></p>
+  <p class="sn-dialog__note" id="cf-note"></p>
+  <div class="sn-dialog__row"><button class="sn-btn sn-btn--ghost" id="cf-cancel">Cancel</button><button class="sn-btn sn-btn--danger" id="cf-ok">Delete</button></div>
+</dialog>
+<div class="sn-toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const ms = (v) => !v ? "" : v >= 10000 ? (v / 1000).toFixed(0) + " s" : v >= 1000 ? (v / 1000).toFixed(1) + " s" : Math.round(v) + " ms";
+const ago = (t) => { const s = Math.max(0, (Date.now() - new Date(t)) / 1000); return s < 45 ? "now" : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
+const toast = (t) => { const el = $("toast"); el.textContent = t; el.classList.add("is-on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("is-on"), 1800); };
+const copy = (v) => { navigator.clipboard?.writeText(v); toast("Copied"); };
+const BASE = location.origin + "/v1";
+
+// Calls that change something carry the UI header, and the router token when one is set.
+async function api(url, opts = {}) {
+  const headers = { "X-Router-UI": "1", "Content-Type": "application/json", ...(opts.headers || {}) };
+  let tok = ""; try { tok = localStorage.getItem("router-token") || ""; } catch {}
+  if (tok) headers["X-Router-Token"] = tok;
+  let r = await fetch(url, { ...opts, headers });
+  if (r.status === 401) {
+    const t = prompt("This router needs its token (ROUTER_TOKEN):");
+    if (t) { try { localStorage.setItem("router-token", t); } catch {} headers["X-Router-Token"] = t; r = await fetch(url, { ...opts, headers }); }
+  }
+  let j = {}; try { j = await r.json(); } catch {}
+  return { ok: r.ok, j, err: j.error?.message || (r.ok ? "" : `HTTP ${r.status}`) };
+}
+function confirmIt(q, note, ok, act) { $("cf-q").textContent = q; $("cf-note").textContent = note; $("cf-ok").textContent = ok; $("cf-ok").onclick = () => { $("confirm").close(); act(); }; $("confirm").showModal(); }
+$("cf-cancel").onclick = () => $("confirm").close();
+
+// ---- what the page knows; refreshed from the API and the live stream
+let PROV = [], META = { names: [], profiles: {}, families: [] }, STATUS = {}, LOG = [], PREVIEW = {};
+const provName = (id) => (PROV.find((p) => p.id === id) || { name: id }).name;
+const initials = (name) => { const w = name.replace(/[^A-Za-z0-9 ]/g, " ").trim().split(/\s+/); return (w.length > 1 ? w[0][0] + w[1][0] : name.slice(0, 2)).replace(/^./, (c) => c.toUpperCase()); };
+
+// ---- lists show a few rows; "N more" opens the whole list in the side panel
+let showing = null;
+const TITLES = { providers: "Providers", profiles: "Profiles", clients: "Clients, last hour", recent: "Recent requests" };
+function clamp(id, n, noun) {
+  const el = $(id); el.querySelector(".showall")?.remove();
+  const items = [...el.querySelectorAll(".it")];
+  items.forEach((r, i) => r.hidden = i >= n);
+  if (showing === id) fillAll(id);
+  if (items.length <= n) return;
+  const rest = items.slice(n).map((r) => (r.querySelector(".pname, .sn-row__title")?.textContent || "").trim());
+  const b = document.createElement("button");
+  b.className = "sn-row showall";
+  b.innerHTML = `<span class="sn-row__main"><span class="sn-row__title">${plural(rest.length, "more " + noun)}</span><span class="sn-row__sub">${esc(rest.slice(0, 3).join(", "))}${rest.length > 3 ? " and others" : ""}</span></span><span class="sn-row__chev"></span>`;
+  b.onclick = () => { showing = id; fillAll(id); openDrawer("ldrawer"); };
+  items[items.length - 1].after(b);
+}
+function fillAll(id) {
+  $("l-title").textContent = TITLES[id];
+  $("l-list").innerHTML = [...$(id).querySelectorAll(".it")].map((r) => { const c = r.cloneNode(true); c.hidden = false; return c.outerHTML; }).join("");
+}
+
+// ---- providers
+function provSub(p) {
+  if (!p.on) return "Off";
+  const bits = [];
+  if (p.models) bits.push(plural(p.models, "model"));
+  else if (p.state !== "ok") bits.push(p.state);
+  if (p.key_mode === "optional" && !p.keys?.length) bits.push("no key needed");
+  if (p.keys?.length) bits.push("your key");
+  if (p.trains) bits.push("may train on prompts");
+  return bits.join(", ").replace(/^./, (c) => c.toUpperCase());
+}
+function provRow(p, inCatalog) {
+  const need = p.key_mode === "required" && !p.keys?.length;
+  const end = inCatalog
+    ? `<button class="sn-btn sn-btn--ghost" data-add="${esc(p.id)}">Add</button>`
+    : `<button class="sn-btn sn-btn--ghost" data-key="${esc(p.id)}">${need ? "Add key" : "Key"}</button>` +
+      `<span class="sn-switch"><input type="checkbox" role="switch" data-on="${esc(p.id)}"${p.on ? " checked" : ""} aria-label="Use ${esc(p.name)}"></span>`;
+  const sub = inCatalog ? (p.disabled && !p.disabled.startsWith("removed") ? p.disabled : p.key_mode === "required" ? "Needs a key" : "Works without a key") : provSub(p);
+  return `<div class="sn-row it"><span class="sn-row__icon">${esc(initials(p.name))}</span>
+    <span class="sn-row__main"><span class="sn-row__title">${esc(p.name)}</span><span class="sn-row__sub sn-row__sub--wrap">${esc(sub)}</span></span>
+    <span class="sn-row__end">${end}</span></div>`;
+}
+function renderProviders() {
+  const listed = PROV.filter((p) => p.listed), rest = PROV.filter((p) => !p.listed);
+  $("providers").innerHTML = listed.map((p) => provRow(p, false)).join("") || '<div class="sn-empty">No providers yet. Add one to get models.</div>';
+  if (rest.length) $("providers").insertAdjacentHTML("beforeend", `<button class="sn-row" id="more-prov"><span class="sn-row__main"><span class="sn-row__title">${plural(rest.length, "more provider")}</span><span class="sn-row__sub">${esc(rest.slice(0, 3).map((p) => p.name).join(", "))}, your own server and others</span></span><span class="sn-row__chev"></span></button>`);
+  $("more-prov")?.addEventListener("click", openCatalog);
+  clamp("providers", 6, "provider");
+  if ($("pdrawer").classList.contains("is-open")) renderCatalog();
+}
+async function loadProviders() {
+  try { PROV = (await (await fetch("/api/providers")).json()).providers || []; } catch { return; }
+  renderProviders(); renderProfiles();
+}
+async function setOn(id, on) {
+  const r = await api(`/api/providers/${encodeURIComponent(id)}/enabled`, { method: "POST", body: JSON.stringify({ enabled: on }) });
+  if (!r.ok) toast(r.err); else toast(`${provName(id)} ${on ? "on" : "off"}`);
+  loadProviders(); setTimeout(loadMeta, 3000);
+}
+function onListClick(e) {
+  const k = e.target.closest("[data-key]"), ed = e.target.closest("[data-edit]"), u = e.target.closest("[data-use]");
+  if (k) { closeDrawers(); openKey(k.dataset.key); }
+  else if (ed) { closeDrawers(); openBuilder(ed.dataset.edit); }
+  else if (u) useProfile(u.dataset.use);
+}
+function onListChange(e) { const id = e.target.dataset.on; if (id) setOn(id, e.target.checked); }
+["providers", "profiles", "l-list"].forEach((id) => { $(id).addEventListener("click", onListClick); $(id).addEventListener("change", onListChange); });
+
+// ---- the key dialog
+let keyFor = null;
+function openKey(id) {
+  const p = keyFor = PROV.find((x) => x.id === id); if (!p) return;
+  $("key-q").textContent = p.key_mode === "optional" ? `${p.name} key` : `Add a ${p.name} key`;
+  $("key-note").textContent = p.key_note || (p.trains ? "The free tier may use prompts for training." : "");
+  $("key-steps").hidden = !p.signup_url;
+  if (p.signup_url) { $("key-link").href = p.signup_url; $("key-link").textContent = new URL(p.signup_url).host; }
+  $("key-input").value = "";
+  const current = (p.keys || []).map((k) => k.masked).join(", ");
+  $("key-msg").textContent = current ? `In use: ${current}. A new key is added next to it.` : "Stored encrypted on this machine. Never shown again in full.";
+  $("key-msg").classList.remove("is-bad");
+  $("key-ok").disabled = false; $("key-ok").textContent = "Add key";
+  $("key-remove").hidden = !p.listed;
+  $("key-dlg").showModal(); $("key-input").focus();
+}
+$("key-cancel").onclick = () => $("key-dlg").close();
+$("key-input").onkeydown = (e) => { if (e.key === "Enter") $("key-ok").click(); };
+$("key-ok").onclick = async () => {
+  const p = keyFor, v = $("key-input").value.trim();
+  if (!v) { $("key-msg").textContent = "Paste the key first."; $("key-msg").classList.add("is-bad"); return; }
+  $("key-ok").disabled = true; $("key-ok").textContent = "Checking...";
+  $("key-msg").classList.remove("is-bad"); $("key-msg").textContent = `Asking ${p.name} for its models with this key...`;
+  const r = await api(`/api/providers/${encodeURIComponent(p.id)}/keys`, { method: "POST", body: JSON.stringify({ key: v }) });
+  if (!r.ok) { $("key-msg").textContent = r.err; $("key-msg").classList.add("is-bad"); $("key-ok").disabled = false; $("key-ok").textContent = "Add key"; return; }
+  $("key-dlg").close(); toast(r.j.warning ? `${p.name}: ${r.j.warning}` : `${p.name} added; its models are being found and checked`);
+  loadProviders(); setTimeout(() => { loadProviders(); loadMeta(); }, 5000);
+};
+$("key-remove").onclick = () => {
+  const p = keyFor; $("key-dlg").close();
+  confirmIt(`Remove ${p.name}?`, "Its models leave every profile, and keys added here are deleted. You can add it again from Add provider.", "Remove", async () => {
+    const r = await api(`/api/providers/${encodeURIComponent(p.id)}`, { method: "DELETE" });
+    toast(r.ok ? `${p.name} removed` : r.err); loadProviders(); setTimeout(loadMeta, 2000);
+  });
+};
+
+// ---- adding a provider
+function renderCatalog() {
+  const rest = PROV.filter((p) => !p.listed);
+  $("catalog").innerHTML = rest.map((p) => provRow(p, true)).join("") || '<div class="sn-empty">Every known provider is added.</div>';
+}
+function openCatalog() { renderCatalog(); $("o-msg").textContent = ""; openDrawer("pdrawer"); }
+$("add-prov").onclick = openCatalog;
+$("catalog").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-add]"); if (!b) return;
+  const p = PROV.find((x) => x.id === b.dataset.add);
+  closeDrawers();
+  if (p.key_mode === "required" && !p.keys?.length) return openKey(p.id);   // the key turns it on
+  setOn(p.id, true);
+});
+$("o-add").onclick = async () => {
+  const body = { id: $("o-name").value.trim().toLowerCase(), base_url: $("o-url").value.trim(), key: $("o-key").value.trim(), discover: "all" };
+  if (!body.id || !body.base_url) { $("o-msg").textContent = "Name and base URL, please."; return; }
+  $("o-add").disabled = true; $("o-msg").textContent = "";
+  const r = await api("/api/providers", { method: "POST", body: JSON.stringify(body) });
+  $("o-add").disabled = false;
+  if (!r.ok) { $("o-msg").textContent = r.err; return; }
+  ["o-name", "o-url", "o-key"].forEach((id) => $(id).value = "");
+  closeDrawers(); toast(`${body.id} added`); loadProviders(); setTimeout(() => { loadProviders(); loadMeta(); }, 5000);
+};
+
+// ---- profiles
+const SORTS = { strongest: "Strongest first", fastest: "Fastest first", cheapest: "Cheapest first", available: "Most available first" };
+function describe(p) {
+  if (p.families && Object.keys(p.families).length) {
+    const famName = (id) => (META.families.find((f) => f.id === id) || { name: id }).name;
+    return Object.entries(p.families).map(([id, at]) => at?.length ? `${famName(id)} at ${at.map(provName).join(", ")}` : `${famName(id)} at any provider`).join("; ");
+  }
+  const bits = [SORTS[p.sort || "strongest"]];
+  (p.require || []).forEach((c) => bits.push(c === "tools" ? "calls tools" : c === "vision" ? "sees images" : "thinks"));
+  if ((p.exclude || []).includes("reasoning")) bits.push("no thinking");
+  if (p.no_training) bits.push("private providers only");
+  if (p.providers?.length) bits.push("at " + p.providers.map(provName).join(", "));
+  if (p.models?.length) bits.push("names like " + p.models.join(", "));
+  if (p.only_pinned) bits.push("pinned models only");
+  if (p.free_only) bits.push("free only");
+  return bits.join(", ");
+}
+function renderProfiles() {
+  const names = META.names || [];
+  $("profiles").innerHTML = names.map((n) => {
+    const p = META.profiles[n] || {}, m = PREVIEW[n];
+    const chips = m ? [`<span class="sn-chip">${plural(m.all, "model")}</span>`, `<span class="sn-chip">${plural(m.provs, "provider")}</span>`].concat(m.now < m.all ? [`<span class="sn-chip">${m.now} usable now</span>`] : []) : [];
+    return `<div class="sn-row it"><span class="sn-row__main"><span class="pname">${esc(n)}</span><span class="sn-row__sub">${esc(describe(p))}</span></span>
+      <span class="chips">${chips.join("")}</span>
+      <span class="sn-row__end"><button class="sn-btn sn-btn--ghost" data-edit="${esc(n)}">Edit</button><button class="sn-btn sn-btn--ghost" data-use="${esc(n)}" title="pick it in Connect your agent">Use</button></span></div>`;
+  }).join("") || '<div class="sn-empty">No profiles. Your agent can still name a model directly.</div>';
+  clamp("profiles", 4, "profile");
+  renderPicker();
+}
+// How many models each profile takes, and how many of them answer now: the router's own preview.
+async function loadPreviews() {
+  await Promise.all((META.names || []).map(async (n) => {   // all profiles at once: the counts appear together
+    try {
+      const r = await fetch("/api/preview", { method: "POST", body: JSON.stringify(META.profiles[n] || {}) });
+      const list = (await r.json()).models || [];
+      const taken = list.filter((e) => e.match || (e.reason || "").startsWith("down now"));
+      PREVIEW[n] = { all: taken.length, now: taken.filter((e) => e.match).length, provs: new Set(taken.map((e) => e.key.split("/")[0])).size };
+    } catch {}
+  }));
+  renderProfiles();
+}
+async function loadMeta() {
+  try { META = await (await fetch("/api/profiles")).json(); } catch { return; }
+  renderProfiles(); loadPreviews();
+}
+
+// ---- the builder: models by family, each from every provider or from the chosen ones
+let editing = null, chosen = new Map(), open = new Set();
+function famOf(id) { return META.families.find((f) => f.id === id); }
+function renderFamilies() {
+  const q = $("p-search").value.trim().toLowerCase();
+  $("families").innerHTML = META.families.filter((f) => !q || f.name.toLowerCase().includes(q) || f.id.includes(q)).map((f) => {
+    const at = chosen.get(f.id) || [], provs = [...new Set(f.models.map((m) => m.provider))], isOpen = open.has(f.id);
+    const where = !at.length ? `at ${provs.map(provName).join(", ")}` : at.length === provs.length ? `at every provider: ${provs.map(provName).join(", ")}` : `only at ${at.map(provName).join(", ")}`;
+    const subs = isOpen ? provs.map((a) => {
+      const ms = f.models.filter((m) => m.provider === a), up = ms.some((m) => m.usable);
+      const note = [up ? "answers now" : "down now", ms.some((m) => m.trains) ? "may train" : "", ms.every((m) => m.paid) ? "paid" : ""].filter(Boolean).join(", ");
+      return `<label class="sn-row sub"><span class="sn-row__main"><span class="sn-row__title">${esc(provName(a))}</span><span class="sn-row__sub">${note}</span></span>
+        <span class="sn-row__end"><span class="sn-switch"><input type="checkbox" role="switch" data-fam="${esc(f.id)}" data-at="${esc(a)}"${at.includes(a) ? " checked" : ""}></span></span></label>`;
+    }).join("") : "";
+    return `<div class="sn-row"><button class="unfold${isOpen ? " is-open" : ""}" data-unfold="${esc(f.id)}" aria-label="Choose providers" title="Choose providers"><span class="sn-row__chev"></span></button>
+      <span class="sn-row__main"><span class="sn-row__title">${esc(f.name)}</span><span class="sn-row__sub">${esc(where)}${f.models.some((m) => m.tools) ? "" : ". No tools"}</span></span>
+      <span class="sn-row__end"><span class="sn-switch"><input type="checkbox" role="switch" data-fam="${esc(f.id)}"${at.length ? " checked" : ""}></span></span></div>${subs}`;
+  }).join("") || '<div class="sn-empty">No model by that name</div>';
+}
+function updateCount() {
+  const tools = $("c-tools").checked, priv = $("c-private").checked, paid = $("c-paid").checked;
+  let all = 0, now = 0; const provs = new Set();
+  for (const [id, at] of chosen) {
+    const f = famOf(id); if (!f) continue;
+    for (const m of f.models) {
+      if (!at.includes(m.provider) || (tools && !m.tools) || (priv && m.trains) || (!paid && m.paid)) continue;
+      all++; provs.add(m.provider); if (m.usable) now++;
+    }
+  }
+  const named = /^[a-z0-9][a-z0-9._-]{0,40}$/.test($("p-name").value.trim());
+  if (!chosen.size) {
+    $("p-count").textContent = $("p-rules").hidden ? "Pick at least one model" : "Keeps its rules from Pro";
+    $("p-save").disabled = !named || $("p-rules").hidden; return;
+  }
+  $("p-count").innerHTML = !all ? "Nothing matches these conditions" : now === all ? `<b>${plural(all, "model")}</b> at ${plural(provs.size, "provider")}` : `<b>${now} of ${plural(all, "model")}</b> usable now`;
+  $("p-save").disabled = !all || !named;
+}
+function openBuilder(name) {
+  editing = name; const p = name ? META.profiles[name] || {} : null;
+  chosen = new Map(); open = new Set();
+  for (const [id, at] of Object.entries(p?.families || {})) {
+    const f = famOf(id), provs = f ? [...new Set(f.models.map((m) => m.provider))] : at;
+    chosen.set(id, at?.length ? at.slice() : provs);
+    if (at?.length && f && at.length < provs.length) open.add(id);
+  }
+  // A profile made of rules in Pro keeps them unless models are picked here.
+  const rules = p && !Object.keys(p.families || {}).length;
+  $("p-rules").hidden = !rules;
+  if (rules) $("p-rules").textContent = `Now: ${describe(p)}. Pick models below to make it a list of models instead, or change its rules in Pro.`;
+  $("dr-title").textContent = p ? `Edit ${name}` : "New profile"; $("p-delete").hidden = !p;
+  $("p-name").value = name || ""; $("p-search").value = "";
+  $("c-tools").checked = p ? (p.require || []).includes("tools") : true;
+  $("c-private").checked = !!p?.no_training;
+  $("c-paid").checked = !!p && !p.free_only && (p.max_cost ?? META.default_max_cost ?? 0) > 0;
+  $("c-paid-sub").textContent = `Only after the free ones, up to $${META.budget ?? 1} a day across paid models`;
+  renderFamilies(); updateCount(); openDrawer("drawer");
+}
+$("families").addEventListener("change", (e) => {
+  const id = e.target.dataset.fam, a = e.target.dataset.at; if (!id) return;
+  const f = famOf(id), provs = [...new Set(f.models.map((m) => m.provider))];
+  if (!a) { e.target.checked ? chosen.set(id, provs) : chosen.delete(id); }
+  else { const at = new Set(chosen.get(id) || []); e.target.checked ? at.add(a) : at.delete(a); at.size ? chosen.set(id, provs.filter((x) => at.has(x))) : chosen.delete(id); }
+  renderFamilies(); updateCount();
+});
+$("families").addEventListener("click", (e) => { const b = e.target.closest("[data-unfold]"); if (!b) return; open.has(b.dataset.unfold) ? open.delete(b.dataset.unfold) : open.add(b.dataset.unfold); renderFamilies(); });
+$("p-search").oninput = renderFamilies;
+["c-tools", "c-private", "c-paid"].forEach((id) => $(id).onchange = updateCount);
+$("p-name").oninput = updateCount;
+$("p-save").onclick = async () => {
+  const name = $("p-name").value.trim();
+  const p = structuredClone(editing ? META.profiles[editing] || {} : {});   // other settings, made in Pro, stay
+  if (chosen.size) {
+    p.families = {};
+    for (const [id, at] of chosen) { const f = famOf(id), provs = [...new Set(f.models.map((m) => m.provider))]; p.families[id] = at.length === provs.length ? [] : at; }
+  }
+  const req = new Set(p.require || []); $("c-tools").checked ? req.add("tools") : req.delete("tools"); p.require = [...req];
+  if (!p.require.length) delete p.require;
+  if ($("c-private").checked) p.no_training = true; else delete p.no_training;
+  if ($("c-paid").checked) { delete p.free_only; if (!(p.max_cost > 0)) p.max_cost = 0.01; } else { p.free_only = true; delete p.max_cost; }
+  const r = await api(`/api/profiles/${encodeURIComponent(name)}`, { method: "PUT", body: JSON.stringify(p) });
+  if (!r.ok) return toast(r.err);
+  if (editing && editing !== name) await api(`/api/profiles/${encodeURIComponent(editing)}`, { method: "DELETE" });   // renamed
+  closeDrawers(); toast(`Saved ${name}`); loadMeta();
+};
+$("p-delete").onclick = () => {
+  const name = editing;
+  confirmIt(`Delete ${name}?`, `A tool that still sends model "${name}" is then served by the default order: the profile auto, or the strongest models first.`, "Delete", async () => {
+    const r = await api(`/api/profiles/${encodeURIComponent(name)}`, { method: "DELETE" });
+    closeDrawers(); toast(r.ok ? `Deleted ${name}` : r.err); loadMeta();
+  });
+};
+$("new-profile").onclick = () => openBuilder(null);
+
+// ---- connect: the same settings as text, for a few tools, with the model picked once
+const TPL = {
+  any: (m) => `Base URL   ${BASE}\nAPI key    router\nModel      ${m}`,
+  flint: (m) => `FLINT_PROVIDER=openai\nFLINT_BASE_URL=${BASE}\nOPENAI_API_KEY=router\nflint --model ${m}`,
+  python: (m) => `from openai import OpenAI\nclient = OpenAI(base_url="${BASE}", api_key="router")\nclient.chat.completions.create(model="${m}", messages=[{"role": "user", "content": "hello"}])`,
+  curl: (m) => `curl ${BASE}/chat/completions \\\n  -H "Content-Type: application/json" \\\n  -d '{"model": "${m}", "messages": [{"role": "user", "content": "hello"}]}'`,
+};
+let useModel = "auto";
+function renderPicker() {
+  const profiles = META.names || [];
+  const direct = (META.families || []).map((f) => (f.models.find((m) => m.usable) || {}).key).filter(Boolean).slice(0, 10);
+  if (![...profiles, ...direct].includes(useModel)) useModel = profiles[0] || direct[0] || "auto";
+  const opt = (v) => `<option value="${esc(v)}"${v === useModel ? " selected" : ""}>${esc(v)}</option>`;
+  $("use-model").innerHTML = `<optgroup label="Profiles: the router picks and switches">${profiles.map(opt).join("")}</optgroup>` +
+    (direct.length ? `<optgroup label="One model alone: no switching">${direct.map(opt).join("")}</optgroup>` : "");
+  document.querySelectorAll("[data-tpl]").forEach((pre) => { pre.textContent = TPL[pre.dataset.tpl](useModel); });
+}
+$("use-model").onchange = (e) => { useModel = e.target.value; renderPicker(); };
+// "Use" on a profile: pick it in Connect and bring Connect into view, the settings ready to copy
+function useProfile(name) {
+  closeDrawers(); useModel = name; renderPicker();
+  $("use-model").closest(".sn-section").scrollIntoView({ behavior: "smooth", block: "center" });
+  toast(`Connect now uses ${name}`);
+}
+$("how").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-how]"); if (!b) return;
+  $("how").querySelectorAll("button").forEach((x) => x.classList.toggle("is-on", x === b));
+  document.querySelectorAll("[data-panel]").forEach((p) => p.hidden = p.dataset.panel !== b.dataset.how);
+});
+document.querySelectorAll("[data-copysnip]").forEach((b) => b.onclick = () => copy(TPL[b.previousElementSibling.dataset.tpl](useModel)));
+// Test sends one short request with the chosen model, the way an agent would; the answer takes the note's place.
+$("test").onclick = async () => {
+  const n = $("cnote"), b = $("test"), m = useModel, t0 = performance.now();
+  b.disabled = true; n.className = ""; n.removeAttribute("title");
+  n.innerHTML = `<span class="sn-think__label">Sending "hello" to ${esc(m)}</span>`;
+  try {
+    const headers = { "Content-Type": "application/json", "X-Router-Client": "dashboard-test" };
+    let tok = ""; try { tok = localStorage.getItem("router-token") || ""; } catch {}
+    if (tok) headers.Authorization = "Bearer " + tok;
+    const r = await fetch("/v1/chat/completions", { method: "POST", headers, body: JSON.stringify({ model: m, max_tokens: 60, messages: [{ role: "user", content: "Say hello in a few words." }] }) });
+    const j = await r.json().catch(() => ({})), by = r.headers.get("X-Router-Model") || j.model || m, secs = ((performance.now() - t0) / 1000).toFixed(1);
+    if (!r.ok) throw new Error(j.error?.message || `HTTP ${r.status}`);
+    n.className = "ok-line"; n.title = `Answer: ${j.choices?.[0]?.message?.content || ""}`;
+    n.innerHTML = `<span class="ok-dot"></span>It works: <b>${esc(by)}</b> answered in ${secs} s`;
+  } catch (err) {
+    n.className = "fail"; n.textContent = `It did not work: ${err.message}`;
+  }
+  b.disabled = false; b.textContent = "Test again";
+};
+
+// ---- live: activity, recent requests, clients, the status line
+function renderActivity() {
+  const now = Date.now(), span = 10 * 60e3, n = 30, step = span / n;
+  const recent = LOG.filter((e) => !e.probe && e.outcome !== "client-left" && now - e.t < span);
+  const B = Array.from({ length: n }, () => ({ ok: 0, bad: 0 }));
+  for (const e of recent) { const b = B[Math.min(n - 1, Math.floor((e.t - (now - span)) / step))]; e.outcome === "ok" ? b.ok++ : b.bad++; }
+  const peak = Math.max(1, ...B.map((b) => b.ok + b.bad));
+  $("bars").innerHTML = B.map((b) => { const all = b.ok + b.bad; return `<span class="bar${all ? "" : " is-empty"}" style="height:${Math.round(all / peak * 100)}%" title="${all} requests${b.bad ? `, ${b.bad} failed` : ""}"><i style="height:${all ? Math.round(b.bad / all * 100) : 0}%"></i></span>`; }).join("");
+  const bad = recent.filter((e) => e.outcome !== "ok").length, oks = recent.filter((e) => e.outcome === "ok" && e.total_ms).map((e) => e.total_ms).sort((a, b) => a - b);
+  if (!recent.length) { $("act-title").textContent = "No requests in the last 10 minutes"; $("act-sub").textContent = "Copy the settings below into a tool and press Test."; }
+  else {
+    $("act-title").innerHTML = `${plural(recent.length, "request")}${bad ? `, <span class="fail">${bad} failed</span>` : ""}`;
+    $("act-sub").textContent = oks.length ? `Median answer ${ms(oks[Math.floor(oks.length / 2)])}.` + (recent.some((e) => e.failures?.length) ? " Some went to the next model after a failure." : "") : "";
+  }
+  const rows = LOG.filter((e) => !e.probe).slice(-30).reverse().map((e) => {
+    const fails = e.failures?.length ? `. <span class="fail">${esc(e.failures[0].replace(/ \(.*$/, ""))} failed</span>${e.model ? ", the next model answered" : ""}` : "";
+    const who = [e.asked ? "asked " + e.asked : "", e.client || "", e.outcome === "ok" ? ms(e.total_ms) : e.outcome].filter(Boolean).join(", ");
+    return `<div class="sn-row it"><span class="sn-row__main"><span class="sn-row__title code">${esc(e.model || "nothing answered")}</span><span class="sn-row__sub sn-row__sub--wrap">${esc(who)}${fails}</span></span><span class="sn-row__meta">${ago(e.t)}</span></div>`;
+  });
+  $("recent").innerHTML = rows.join("") || '<div class="sn-empty">No requests yet. They show up here as soon as a tool sends one.</div>';
+  clamp("recent", 4, "request");
+}
+function renderClients() {
+  const list = STATUS.clients || [];
+  $("clients").innerHTML = list.map((c) => `<div class="sn-row it"><span class="sn-row__icon">${esc(initials(c.client))}</span>
+    <span class="sn-row__main"><span class="sn-row__title">${esc(c.client)}</span><span class="sn-row__sub">${esc((c.profiles || []).join(", "))}, ${plural(c.requests, "request")}</span></span>
+    <span class="sn-row__meta">${c.inflight ? '<span class="ok-dot"></span> now' : ago(c.last)}</span></div>`).join("") ||
+    '<div class="sn-empty">No tool has used the router in the last hour. Copy the settings and press Test.</div>';
+  clamp("clients", 3, "client");
+}
+function renderRun() {
+  const up = (STATUS.models || []).filter((m) => m.state === "ok").length;
+  $("run").textContent = `Running, ${plural(up, "model")} up`;
+  $("run-dot").className = up ? "ok-dot" : "off-dot";
+}
+let dirty = false;
+function connect() {
+  const es = new EventSource("/events");
+  es.onerror = () => { $("run").textContent = "reconnecting"; $("run-dot").className = "off-dot"; };
+  es.addEventListener("history", (e) => { LOG = JSON.parse(e.data) || []; dirty = true; });
+  es.addEventListener("request", (e) => { LOG.push(JSON.parse(e.data)); if (LOG.length > 500) LOG.shift(); dirty = true; });
+  es.addEventListener("status", (e) => { STATUS = JSON.parse(e.data); dirty = true; });
+}
+setInterval(() => { if (dirty) { dirty = false; renderActivity(); renderClients(); renderRun(); } }, 1000);
+setInterval(() => { renderActivity(); }, 20000);   // the chart's time moves even when idle
+setInterval(() => { if (!document.querySelector(".sn-drawer.is-open, dialog[open]")) { loadProviders(); loadPreviews(); } }, 30000);
+
+// ---- drawers and the mode switch
+function openDrawer(id) { $(id).classList.add("is-open"); $("veil").classList.add("is-on"); if (id === "drawer") setTimeout(() => $(editing ? "p-search" : "p-name").focus(), 200); }
+function closeDrawers() { showing = null; document.querySelectorAll(".sn-drawer").forEach((d) => d.classList.remove("is-open")); $("veil").classList.remove("is-on"); }
+document.querySelectorAll("[data-close]").forEach((b) => b.onclick = closeDrawers);
+$("veil").onclick = closeDrawers;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !document.querySelector("dialog[open]")) closeDrawers(); });
+$("to-pro").onclick = () => { try { localStorage.setItem("router-mode", "pro"); } catch {} location.href = "/pro"; };
+
+renderPicker(); renderActivity(); renderClients();
+loadProviders(); loadMeta(); connect();
+</script>
+<script src="/ui/help.js"></script>
+<script>wendHelp(document.getElementById("help-btn"), "start");</script>
+</body>
+</html>

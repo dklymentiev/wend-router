@@ -1,0 +1,556 @@
+{
+  "_note": "Providers the router knows, checked 2026-10-22. A provider is used when its key env var is set (or no_key is true and it answers). Tier 1 is strongest; tiers are provisional until the test mode ranks models. Seed models missing from a provider's live /models list are skipped. Not here on purpose: Cerebras (one-time card credit, no free tier), GitHub Models (retired 2026-07-30), Together and Hugging Face (no free credits).",
+  "providers": [
+    {
+      "id": "groq",
+      "name": "Groq",
+      "base_url": "https://api.groq.com/openai/v1",
+      "key_env": [
+        "GROQ_API_KEY"
+      ],
+      "trains_on_free": false,
+      "discover": "all",
+      "exclude": [
+        "whisper",
+        "guard",
+        "safeguard",
+        "tts",
+        "playai",
+        "orpheus",
+        "distil",
+        "compound",
+        "allam"
+      ],
+      "default_tier": 3,
+      "models": [
+        {
+          "id": "openai/gpt-oss-120b",
+          "tier": 2,
+          "context": 131072,
+          "tools": true,
+          "vision": false,
+          "domains": [
+            "code",
+            "reasoning"
+          ]
+        },
+        {
+          "id": "qwen/qwen3.8-27b",
+          "tier": 2,
+          "context": 131072
+        },
+        {
+          "id": "openai/gpt-oss-20b",
+          "tier": 3,
+          "context": 131072,
+          "tools": true,
+          "vision": false
+        }
+      ],
+      "signup_url": "https://console.groq.com/keys"
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "base_url": "https://openrouter.ai/api/v1",
+      "key_env": [
+        "OPENROUTER_API_KEY"
+      ],
+      "trains_on_free": true,
+      "discover": "free",
+      "default_tier": 3,
+      "models": [
+        {
+          "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+          "tier": 1
+        },
+        {
+          "id": "thinkingmachines/inkling:free",
+          "tier": 1
+        },
+        {
+          "id": "nvidia/nemotron-3.5-super-vl:free",
+          "tier": 2
+        },
+        {
+          "id": "google/gemma-4-31b-it:free",
+          "tier": 2
+        },
+        {
+          "id": "nvidia/nemotron-3-super-120b-a12b:free",
+          "tier": 2
+        }
+      ],
+      "account_path": "/key",
+      "probe_every": "2h",
+      "signup_url": "https://openrouter.ai/settings/keys",
+      "test_manual": true,
+      "exclude": [
+        "kilo-auto",
+        "openrouter/free",
+        "/auto"
+      ]
+    },
+    {
+      "id": "nvidia",
+      "name": "NVIDIA",
+      "base_url": "https://integrate.api.nvidia.com/v1",
+      "key_env": [
+        "NVIDIA_API_KEY"
+      ],
+      "trains_on_free": true,
+      "_why_trains": "policy not documented; terms allow evaluation only",
+      "discover": "seed",
+      "default_tier": 3,
+      "models": [
+        {
+          "id": "moonshotai/kimi-k2.6",
+          "tier": 1
+        },
+        {
+          "id": "z-ai/glm-5.3",
+          "tier": 1
+        },
+        {
+          "id": "nvidia/nemotron-3-ultra-550b-a55b",
+          "tier": 1
+        },
+        {
+          "id": "deepseek-ai/deepseek-v4.1-flash",
+          "tier": 2
+        },
+        {
+          "id": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+          "tier": 2,
+          "vision": true
+        },
+        {
+          "id": "google/gemma-4-31b-it",
+          "tier": 3
+        }
+      ],
+      "signup_url": "https://build.nvidia.com"
+    },
+    {
+      "id": "gemini",
+      "name": "Google AI Studio",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "key_env": [
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY"
+      ],
+      "trains_on_free": true,
+      "_why_seed": "seed only: the live list also has models without a free tier",
+      "discover": "seed",
+      "default_tier": 3,
+      "models": [
+        {
+          "id": "gemini-3.8-flash",
+          "tier": 2,
+          "context": 1048576,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "gemini-3.6-flash",
+          "tier": 2,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "gemini-3-flash-preview",
+          "tier": 3
+        },
+        {
+          "id": "gemini-2.5-flash",
+          "tier": 3,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "gemini-3.5-flash-lite",
+          "tier": 3,
+          "context": 1048576,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "gemini-3.1-flash-lite",
+          "tier": 3
+        },
+        {
+          "id": "gemma-4-31b-it",
+          "tier": 3,
+          "tools": true,
+          "vision": true
+        }
+      ],
+      "probe_every": "2h",
+      "signup_url": "https://aistudio.google.com/apikey",
+      "test_manual": true
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral",
+      "disabled": "2026-10-22: free API gone; a free (Le Chat) account gets x-ratelimit-limit-req-minute: 0. Plans offered: Free (Le Chat), Pro, Team, Pay-as-you-go.",
+      "base_url": "https://api.mistral.ai/v1",
+      "key_env": [
+        "MISTRAL_API_KEY"
+      ],
+      "trains_on_free": true,
+      "discover": "seed",
+      "default_tier": 3,
+      "models": [
+        {
+          "id": "mistral-medium-latest",
+          "tier": 2
+        },
+        {
+          "id": "magistral-medium-latest",
+          "tier": 2
+        },
+        {
+          "id": "mistral-small-latest",
+          "tier": 3
+        },
+        {
+          "id": "codestral-latest",
+          "tier": 3
+        }
+      ],
+      "signup_url": "https://console.mistral.ai"
+    },
+    {
+      "id": "sambanova",
+      "name": "SambaNova",
+      "disabled": "2026-10-22: every model answers 402 PAYMENT_METHOD_REQUIRED without a card on file.",
+      "base_url": "https://api.sambanova.ai/v1",
+      "key_env": [
+        "SAMBANOVA_API_KEY"
+      ],
+      "trains_on_free": false,
+      "discover": "seed",
+      "default_tier": 3,
+      "models": [
+        {
+          "id": "DeepSeek-V3.1",
+          "tier": 2,
+          "context": 131072,
+          "vision": false
+        },
+        {
+          "id": "MiniMax-M3",
+          "tier": 2
+        },
+        {
+          "id": "gpt-oss-120b",
+          "tier": 2,
+          "context": 131072,
+          "vision": false,
+          "domains": [
+            "code",
+            "reasoning"
+          ]
+        },
+        {
+          "id": "gemma-4-31B-it",
+          "tier": 3
+        },
+        {
+          "id": "Meta-Llama-3.3-70B-Instruct",
+          "tier": 3,
+          "context": 131072,
+          "vision": false
+        }
+      ],
+      "signup_url": "https://cloud.sambanova.ai/apis"
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare Workers AI",
+      "base_url": "https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+      "key_env": [
+        "CLOUDFLARE_API_TOKEN"
+      ],
+      "trains_on_free": false,
+      "_why_seed_only": "no /models on the OpenAI-compatible path",
+      "discover": "seed-only",
+      "default_tier": 3,
+      "models": [
+        {
+          "id": "@cf/openai/gpt-oss-120b",
+          "tier": 3,
+          "domains": [
+            "code",
+            "reasoning"
+          ]
+        },
+        {
+          "id": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+          "tier": 4
+        }
+      ],
+      "signup_url": "https://dash.cloudflare.com/profile/api-tokens"
+    },
+    {
+      "id": "kilo",
+      "name": "Kilo",
+      "key_note": "Optional. Without a key: the free models. With your key: your account's models too, paid ones only when a profile allows paid.",
+      "base_url": "https://api.kilo.ai/api/gateway",
+      "no_key": true,
+      "key_env": [
+        "KILO_API_KEY"
+      ],
+      "trains_on_free": true,
+      "discover": "free",
+      "exclude": [
+        "kilo-auto",
+        "openrouter/free",
+        "/auto"
+      ],
+      "default_tier": 3,
+      "probe_every": "2h",
+      "signup_url": "https://kilo.ai",
+      "_note": "Works without a key: 200 requests/hour per IP, free models only. Free routing may go to providers that log and train.",
+      "models": [
+        {
+          "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+          "tier": 1
+        },
+        {
+          "id": "nvidia/nemotron-3.5-super-vl:free",
+          "tier": 2
+        },
+        {
+          "id": "nvidia/nemotron-3-super-120b-a12b:free",
+          "tier": 2
+        }
+      ]
+    },
+    {
+      "id": "ovh",
+      "name": "OVHcloud",
+      "key_note": "Optional. With a key OVHcloud bills per use instead of the free anonymous tier.",
+      "base_url": "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+      "no_key": true,
+      "trains_on_free": false,
+      "discover": "seed",
+      "default_tier": 3,
+      "probe_every": "1h",
+      "signup_url": "https://www.ovhcloud.com/en/public-cloud/ai-endpoints/",
+      "_note": "Anonymous only: 2 requests/minute per IP per model, EU, no training. A key would switch to pay-as-you-go, so none is ever sent.",
+      "models": [
+        {
+          "id": "Qwen3.5-397B-A17B",
+          "tier": 1,
+          "context": 262144,
+          "domains": [
+            "code",
+            "reasoning"
+          ]
+        },
+        {
+          "id": "gpt-oss-120b",
+          "tier": 2,
+          "context": 131072,
+          "domains": [
+            "code",
+            "reasoning"
+          ]
+        },
+        {
+          "id": "Qwen3.8-27B",
+          "tier": 2,
+          "context": 262144
+        },
+        {
+          "id": "Qwen3.6-27B",
+          "tier": 3,
+          "context": 262144
+        },
+        {
+          "id": "Meta-Llama-3_3-70B-Instruct",
+          "tier": 3,
+          "context": 131072
+        },
+        {
+          "id": "Mistral-Small-3.2-24B-Instruct-2506",
+          "tier": 3,
+          "context": 131072
+        },
+        {
+          "id": "Qwen2.5-VL-72B-Instruct",
+          "tier": 3,
+          "context": 32768,
+          "vision": true
+        },
+        {
+          "id": "gpt-oss-20b",
+          "tier": 3,
+          "context": 131072
+        }
+      ]
+    },
+    {
+      "id": "zai",
+      "name": "Z.ai",
+      "base_url": "https://api.z.ai/api/paas/v4",
+      "key_env": [
+        "ZAI_API_KEY"
+      ],
+      "trains_on_free": true,
+      "discover": "seed-only",
+      "default_tier": 3,
+      "signup_url": "https://z.ai/manage-apikey/apikey-list",
+      "_note": "GLM Flash models are free; about 1 request at a time. API terms say content is not stored; which policy covers free accounts is not stated. The free Flash models are missing from GET /models (only paid ones are listed) but answer chat calls, so the seed list is used as is.",
+      "models": [
+        {
+          "id": "glm-4.7-flash",
+          "tier": 2,
+          "context": 200000,
+          "tools": true,
+          "vision": false,
+          "domains": [
+            "code"
+          ]
+        },
+        {
+          "id": "glm-4.6v-flash",
+          "tier": 3,
+          "vision": true
+        }
+      ]
+    },
+    {
+      "id": "requesty",
+      "name": "Requesty",
+      "base_url": "https://router.requesty.ai/v1",
+      "key_env": [
+        "REQUESTY_API_KEY"
+      ],
+      "trains_on_free": true,
+      "discover": "seed",
+      "default_tier": 3,
+      "signup_url": "https://app.requesty.ai",
+      "_note": "Free models: 200 requests/day, 20/minute per organization. Training is per model.",
+      "models": [
+        {
+          "id": "nvidia/nemotron-3-ultra-550b-a55b",
+          "tier": 1,
+          "tools": true,
+          "vision": false
+        },
+        {
+          "id": "google/gemma-4-31b-it",
+          "tier": 2,
+          "tools": true,
+          "vision": true,
+          "trains": false
+        },
+        {
+          "id": "mistral/leanstral-1-5",
+          "tier": 3,
+          "tools": true,
+          "vision": false,
+          "trains": false
+        },
+        {
+          "id": "novita/ling-3.1-flash",
+          "tier": 3,
+          "tools": true,
+          "vision": false,
+          "trains": false
+        },
+        {
+          "id": "nvidia/nemotron-3-super-120b-a12b",
+          "tier": 2,
+          "tools": true,
+          "vision": false
+        }
+      ]
+    },
+    {
+      "id": "ollama-cloud",
+      "name": "Ollama Cloud",
+      "base_url": "https://ollama.com/v1",
+      "key_env": [
+        "OLLAMA_API_KEY"
+      ],
+      "trains_on_free": false,
+      "discover": "all",
+      "exclude": [
+        "embed"
+      ],
+      "default_tier": 3,
+      "probe_every": "6h",
+      "signup_url": "https://ollama.com/settings/keys",
+      "_note": "Monthly starter allowance (size not published), 1 request at a time. Never logged or trained on.",
+      "test_manual": true
+    },
+    {
+      "id": "llm7",
+      "name": "LLM7",
+      "base_url": "https://api.llm7.io/v1",
+      "key_env": [
+        "LLM7_API_KEY"
+      ],
+      "trains_on_free": true,
+      "discover": "seed",
+      "default_tier": 3,
+      "signup_url": "https://dash.llm7.io",
+      "_note": "Free token: 100K tokens a day, 60/minute, small models only. Training not stated.",
+      "models": [
+        {
+          "id": "gpt-oss:20b",
+          "tier": 3,
+          "tools": true
+        },
+        {
+          "id": "minimax-m2.7",
+          "tier": 3,
+          "tools": true,
+          "domains": [
+            "code"
+          ]
+        },
+        {
+          "id": "nemotron-3-nano:30b",
+          "tier": 3,
+          "tools": true
+        },
+        {
+          "id": "codestral-latest",
+          "tier": 3,
+          "tools": true
+        }
+      ]
+    },
+    {
+      "id": "hetzner",
+      "name": "Hetzner",
+      "base_url": "https://inference.hetzner.com/api/v1",
+      "key_env": [
+        "HETZNER_INFERENCE_TOKEN"
+      ],
+      "trains_on_free": false,
+      "discover": "all",
+      "default_tier": 3,
+      "signup_url": "https://console.hetzner.com",
+      "_note": "Free while experimental: 10 requests/minute per key. Content not stored."
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama (this machine)",
+      "key_note": "Optional, only if your Ollama server checks one.",
+      "base_url": "http://localhost:11434/v1",
+      "base_url_env": "OLLAMA_URL",
+      "no_key": true,
+      "trains_on_free": false,
+      "discover": "all",
+      "exclude": [
+        "embed"
+      ],
+      "default_tier": 9
+    }
+  ]
+}
