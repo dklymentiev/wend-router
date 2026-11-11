@@ -9,6 +9,10 @@ with availability.
 Free tiers first; paid models only when you allow them, within a budget.
 Single Go binary, no dependencies, a dashboard built in.
 
+New to it? [How to run Claude Code and any AI agent for free](https://klymentiev.com/blog/claude-code-free)
+walks through the setup step by step, with four agents on four profiles.
+Also as a free 10-page PDF.
+
 > To *wend one's way*: to make one's way, going around what is in the road.
 
 ![The dashboard: models, their state and speed](assets/dashboard.jpg)
