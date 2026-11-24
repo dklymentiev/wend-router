@@ -3,6 +3,16 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-11-23
+
+### Fixed
+
+- Filter: a non-streamed answer now gets the original values back even when its
+  JSON writes `<` and `>` as `\u003c` and `\u003e`. The router writes them that
+  way itself when it assembles a streamed upstream answer into one response, so
+  such answers came back with the placeholders (`<HOST_1>`, `<PERSON_1>`) left in.
+  Streamed answers were not affected.
+
 ## [0.2.0] - 2026-11-09
 
 The first public release.
@@ -47,4 +57,5 @@ The first public release.
 - Release binaries for Linux, macOS and Windows on amd64 and arm64; examples
   for curl, Python, Node and coding agents.
 
+[0.2.1]: https://github.com/dklymentiev/wend-router/releases/tag/v0.2.1
 [0.2.0]: https://github.com/dklymentiev/wend-router/releases/tag/v0.2.0

@@ -67,14 +67,31 @@ func TestFilterRoundTripKeepsJSONValid(t *testing.T) {
 	if !strings.Contains(restored, "Acme") || !strings.Contains(restored, `C:\\Users\\jdoe\\a.txt`) {
 		t.Fatalf("restore failed: %s", restored)
 	}
-	// Upstreams that escape < and > must restore too.
-	escaped := []byte(`{"content":"for <ORG_1>"}`)
+	// Upstreams that escape < and > must restore too, and so must the router's own json.Marshal.
+	escaped := []byte(`{"content":"for \u003cORG_1\u003e"}`)
 	if got := string(f.Response("s1", escaped)); !strings.Contains(got, "Acme") {
 		t.Fatalf("escaped placeholder not restored: %s", got)
 	}
 	var check map[string]string
 	if err := json.Unmarshal([]byte(restored), &check); err != nil {
 		t.Fatalf("restored body is not valid JSON: %v", err)
+	}
+}
+
+// A stream the router assembles into one answer goes through json.Marshal, which writes < as \u003c.
+// That answer must come back with the original, not the placeholder (a host name came back as <HOST_1>).
+func TestFilterRestoresTheRoutersOwnAssembledAnswer(t *testing.T) {
+	f := &termFilter{sessions: map[string]*filterSession{}, terms: testTerms(t, "Acme\tORG\n"),
+		cfg: filterConfig{Enabled: true, Terms: "x"}}
+	body := map[string]json.RawMessage{"messages": json.RawMessage(`[{"role":"user","content":"see Acme"}]`)}
+	if err := f.Request("s1", body); err != nil {
+		t.Fatal(err)
+	}
+	a := &assembler{}
+	a.content.WriteString("see https://<ORG_1>/a.jpg and <ORG_1>")
+	got := string(f.Response("s1", a.completion()))
+	if strings.Contains(got, "ORG_1") || strings.Count(got, "Acme") != 2 {
+		t.Fatalf("assembled answer not restored: %s", got)
 	}
 }
 

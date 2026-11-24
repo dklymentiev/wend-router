@@ -369,7 +369,10 @@ func (f *termFilter) Response(session string, body []byte) []byte {
 		phJSON, _ := jsonBytes(ph)
 		phJSON = phJSON[1 : len(phJSON)-1]
 		body = bytes.ReplaceAll(body, phJSON, esc)
-		body = bytes.ReplaceAll(body, []byte(`<`+ph[1:len(ph)-1]+`>`), esc) // upstreams that escape < and >
+		// Go's json.Marshal (the router's own completion() when it assembles a streamed answer) and some
+		// upstreams write < and > as \u003c and \u003e. The line here used to rebuild the literal placeholder,
+		// so such answers came back with the placeholder left in.
+		body = bytes.ReplaceAll(body, []byte(`\u003c`+ph[1:len(ph)-1]+`\u003e`), esc)
 
 	}
 	return body

@@ -16,7 +16,7 @@ import (
 )
 
 // version is set at release builds with -ldflags "-X main.version=v0.1.0".
-var version = "0.2.0" // a release build may set it with -ldflags "-X main.version=..."
+var version = "0.2.1" // a release build may set it with -ldflags "-X main.version=..."
 
 const usage = `wend: one local endpoint for many LLM providers.
 
